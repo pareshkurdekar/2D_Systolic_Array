@@ -8,7 +8,7 @@ parameter psum_bw = 16;
 
 input clk;
 input reset;
-input [33:0] inst; 
+input [35:0] inst; 
 output ofifo_valid;
 input [bw*row-1:0]D_xmem;
 output [col*psum_bw-1:0] sfp_out;
@@ -27,7 +27,11 @@ wire l0_wr;
 wire execute;
 wire load;
 wire acc;
+wire mode;
+wire data_mode;
 
+assign mode         = inst[35];
+assign data_mode    = inst[34];
 assign acc          = inst[33];
 assign CEN_pmem     = inst[32];
 assign WEN_pmem     = inst[31];
@@ -46,7 +50,7 @@ assign load         = inst[0];
 wire [31:0 ]Q_act;
 wire [31:0 ]Q_wt;
 
-wire [bw*col-1:0] l0_in;
+reg [bw*col-1:0] l0_in;
 wire [bw*col-1:0] ififo_in;
 
 // Sram 1 Instantiation for L0
@@ -90,8 +94,26 @@ corelet core_inst1 (
 
 );
 
+// output or wt stationary
 
-assign l0_in = Q_act;
+always @(*)
+begin
+    if(mode)    // Weight Stationary
+    begin
+        
+        if(data_mode) // Send in Weight/ Activation
+            l0_in = Q_wt;  // If data mode is 1, send wt to L0
+        else                  
+            l0_in = Q_act; // If data mode is 0, send act to L0
+
+    end
+    else       // Output Stationary
+    begin
+    
+
+    end
+end
+// assign l0_in = Q_act;
 assign ififo_in = Q_wt;
 
 

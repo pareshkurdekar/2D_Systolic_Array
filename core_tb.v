@@ -28,8 +28,10 @@ parameter len_nij = 64;
 reg clk = 0;
 reg reset = 1;
 
-wire [33:0] inst_q; 
+wire [35:0] inst_q; 
 
+reg mode_q = 0;
+reg data_mode_q = 0;
 reg [1:0]  inst_w_q = 0; 
 reg [bw*row-1:0] D_xmem_q = 0;
 reg CEN_xmem = 1;
@@ -58,7 +60,8 @@ reg [1:0]  inst_w;
 reg [bw*row-1:0] D_xmem;
 reg [psum_bw*col-1:0] answer;
 
-
+reg mode;
+reg data_mode;
 reg ofifo_rd;
 reg ififo_wr;
 reg ififo_rd;
@@ -79,6 +82,8 @@ integer captured_data;
 integer t, i, j, k, kij;
 integer error;
 
+assign inst_q[35] = mode_q;
+assign inst_q[34] = data_mode_q;
 assign inst_q[33] = acc_q;
 assign inst_q[32] = CEN_pmem_q;
 assign inst_q[31] = WEN_pmem_q;
@@ -106,6 +111,8 @@ core  #(.bw(bw), .col(col), .row(row)) core_instance (
 
 initial begin 
 
+  mode = 0;
+  data_mode = 0;
   inst_w   = 0; 
   D_xmem   = 0;
   CEN_xmem = 1;
@@ -237,6 +244,46 @@ initial begin
 
     /////// Kernel data writing to L0 ///////
  
+    #0.5 clk = 1'b0;  mode = 1; data_mode = 1;  // Send wt in wt stationary mode
+    #0.5 clk = 1'b1; 
+
+    
+    for (t=0; t<col; t=t+1) begin  
+      #0.5 clk = 1'b0;   l0_rd = 0; l0_wr = 1; WEN_pmem = 1; CEN_pmem = 0; if (t>0) A_pmem = A_pmem + 1; 
+      #0.5 clk = 1'b1;  
+    end
+
+    #0.5 clk = 1'b0;   l0_rd = 0; l0_wr = 0; WEN_xmem = 1;  CEN_xmem = 1; A_pmem = 0;
+    #0.5 clk = 1'b1; 
+
+
+  
+    /////////////////////////////////////
+
+
+
+    /////// Kernel loading to PEs ///////
+    
+    
+    /////////////////////////////////////
+  
+
+
+    ////// provide some intermission to clear up the kernel loading ///
+    #0.5 clk = 1'b0;  load = 0; l0_rd = 0;
+    #0.5 clk = 1'b1;  
+  
+
+    for (i=0; i<10 ; i=i+1) begin
+      #0.5 clk = 1'b0;
+      #0.5 clk = 1'b1;  
+    end
+    /////////////////////////////////////
+
+
+
+    /////// Activation data writing to L0 ///////
+    
  // Writing into L0
 
 
@@ -280,32 +327,6 @@ initial begin
 
 
 
-  
-    /////////////////////////////////////
-
-
-
-    /////// Kernel loading to PEs ///////
-    //...
-    /////////////////////////////////////
-  
-
-
-    ////// provide some intermission to clear up the kernel loading ///
-    #0.5 clk = 1'b0;  load = 0; l0_rd = 0;
-    #0.5 clk = 1'b1;  
-  
-
-    for (i=0; i<10 ; i=i+1) begin
-      #0.5 clk = 1'b0;
-      #0.5 clk = 1'b1;  
-    end
-    /////////////////////////////////////
-
-
-
-    /////// Activation data writing to L0 ///////
-    //...
     /////////////////////////////////////
 
 
@@ -397,7 +418,11 @@ initial begin
 end
 
 always @ (posedge clk) begin
+
+   
    inst_w_q   <= inst_w; 
+   mode_q <= mode;
+   data_mode_q <= data_mode;
    D_xmem_q   <= D_xmem;
    CEN_xmem_q <= CEN_xmem;
    WEN_xmem_q <= WEN_xmem;
