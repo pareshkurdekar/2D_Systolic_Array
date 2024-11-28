@@ -7,6 +7,7 @@
 
 `include "corelet.v"
 `include "sram_128b_w2048.v"
+`include "sram_32b_w2048.v"
 `include "fifo_depth64.v"
 `include "fifo_mux_16_1.v"
 `include "fifo_mux_8_1.v"
@@ -168,61 +169,73 @@ initial begin
   // /////////////////////////////////////////////////
 
 
-  // for (kij=0; kij<9; kij=kij+1) begin  // kij loop
+  for (kij=0; kij<9; kij=kij+1) begin  // kij loop
 
-  //   case(kij)
-  //    0: w_file_name = "weight_itile0_otile0_kij0.txt";
-  //    1: w_file_name = "weight_itile0_otile0_kij1.txt";
-  //    2: w_file_name = "weight_itile0_otile0_kij2.txt";
-  //    3: w_file_name = "weight_itile0_otile0_kij3.txt";
-  //    4: w_file_name = "weight_itile0_otile0_kij4.txt";
-  //    5: w_file_name = "weight_itile0_otile0_kij5.txt";
-  //    6: w_file_name = "weight_itile0_otile0_kij6.txt";
-  //    7: w_file_name = "weight_itile0_otile0_kij7.txt";
-  //    8: w_file_name = "weight_itile0_otile0_kij8.txt";
-  //   endcase
+    case(kij)
+     0: w_file_name = "weight_itile0_otile0_kij0.txt";
+     1: w_file_name = "weight_itile0_otile0_kij1.txt";
+     2: w_file_name = "weight_itile0_otile0_kij2.txt";
+     3: w_file_name = "weight_itile0_otile0_kij3.txt";
+     4: w_file_name = "weight_itile0_otile0_kij4.txt";
+     5: w_file_name = "weight_itile0_otile0_kij5.txt";
+     6: w_file_name = "weight_itile0_otile0_kij6.txt";
+     7: w_file_name = "weight_itile0_otile0_kij7.txt";
+     8: w_file_name = "weight_itile0_otile0_kij8.txt";
+    endcase
     
 
-  //   w_file = $fopen(w_file_name, "r");
-  //   // Following three lines are to remove the first three comment lines of the file
-  //   w_scan_file = $fscanf(w_file,"%s", captured_data);
-  //   w_scan_file = $fscanf(w_file,"%s", captured_data);
-  //   w_scan_file = $fscanf(w_file,"%s", captured_data);
+    w_file = $fopen(w_file_name, "r");
+    // Following three lines are to remove the first three comment lines of the file
+    w_scan_file = $fscanf(w_file,"%s", captured_data);
+    w_scan_file = $fscanf(w_file,"%s", captured_data);
+    w_scan_file = $fscanf(w_file,"%s", captured_data);
 
-  //   #0.5 clk = 1'b0;   reset = 1;
-  //   #0.5 clk = 1'b1; 
+    #0.5 clk = 1'b0;   reset = 1;
+    #0.5 clk = 1'b1; 
 
-  //   for (i=0; i<10 ; i=i+1) begin
-  //     #0.5 clk = 1'b0;
-  //     #0.5 clk = 1'b1;  
-  //   end
+    for (i=0; i<10 ; i=i+1) begin
+      #0.5 clk = 1'b0;
+      #0.5 clk = 1'b1;  
+    end
 
-  //   #0.5 clk = 1'b0;   reset = 0;
-  //   #0.5 clk = 1'b1; 
+    #0.5 clk = 1'b0;   reset = 0;
+    #0.5 clk = 1'b1; 
 
-  //   #0.5 clk = 1'b0;   
-  //   #0.5 clk = 1'b1;   
-
-
+    #0.5 clk = 1'b0;   
+    #0.5 clk = 1'b1;   
 
 
 
-  //   /////// Kernel data writing to memory ///////
-
-  //   A_xmem = 11'b10000000000;
-
-  //   for (t=0; t<col; t=t+1) begin  
-  //     #0.5 clk = 1'b0;  w_scan_file = $fscanf(w_file,"%32b", D_xmem); WEN_xmem = 0; CEN_xmem = 0; if (t>0) A_xmem = A_xmem + 1; 
-  //     #0.5 clk = 1'b1;  
-  //   end
-
-  //   #0.5 clk = 1'b0;  WEN_xmem = 1;  CEN_xmem = 1; A_xmem = 0;
-  //   #0.5 clk = 1'b1; 
-  //   /////////////////////////////////////
 
 
+    /////// Kernel data writing to memory ///////
 
-  //   /////// Kernel data writing to L0 ///////
+    A_xmem = 11'b10000000000;
+
+    for (t=0; t<col; t=t+1) begin  
+      #0.5 clk = 1'b0;  w_scan_file = $fscanf(w_file,"%32b", D_xmem); WEN_pmem = 0; CEN_pmem = 0; if (t>0) A_pmem = A_pmem + 1; 
+      #0.5 clk = 1'b1;  
+    end
+
+    #0.5 clk = 1'b0;  WEN_pmem = 1;  CEN_pmem = 1; A_pmem = 0;
+    #0.5 clk = 1'b1; 
+
+  
+   //// Reading data from SRAM for testing
+    // for (t=0; t<col; t=t+1) begin  
+    //   #0.5 clk = 1'b0;  w_scan_file = $fscanf(w_file,"%32b", D_xmem); WEN_pmem = 1; CEN_pmem = 0; if (t>0) A_pmem = A_pmem + 1; 
+    //   #0.5 clk = 1'b1;  
+    // end
+
+    // #0.5 clk = 1'b0;  WEN_pmem = 1;  CEN_pmem = 1; A_pmem = 0;
+    // #0.5 clk = 1'b1; 
+
+
+    /////////////////////////////////////
+
+
+
+    /////// Kernel data writing to L0 ///////
  
  // Writing into L0
 
@@ -268,49 +281,49 @@ initial begin
 
 
   
-  //   /////////////////////////////////////
+    /////////////////////////////////////
 
 
 
-  //   /////// Kernel loading to PEs ///////
-  //   ...
-  //   /////////////////////////////////////
+    /////// Kernel loading to PEs ///////
+    //...
+    /////////////////////////////////////
   
 
 
-  //   ////// provide some intermission to clear up the kernel loading ///
-  //   #0.5 clk = 1'b0;  load = 0; l0_rd = 0;
-  //   #0.5 clk = 1'b1;  
+    ////// provide some intermission to clear up the kernel loading ///
+    #0.5 clk = 1'b0;  load = 0; l0_rd = 0;
+    #0.5 clk = 1'b1;  
   
 
-  //   for (i=0; i<10 ; i=i+1) begin
-  //     #0.5 clk = 1'b0;
-  //     #0.5 clk = 1'b1;  
-  //   end
-  //   /////////////////////////////////////
+    for (i=0; i<10 ; i=i+1) begin
+      #0.5 clk = 1'b0;
+      #0.5 clk = 1'b1;  
+    end
+    /////////////////////////////////////
 
 
 
-  //   /////// Activation data writing to L0 ///////
-  //   ...
-  //   /////////////////////////////////////
+    /////// Activation data writing to L0 ///////
+    //...
+    /////////////////////////////////////
 
 
 
-  //   /////// Execution ///////
-  //   ...
-  //   /////////////////////////////////////
+    /////// Execution ///////
+    //...
+    /////////////////////////////////////
 
 
 
-  //   //////// OFIFO READ ////////
-  //   // Ideally, OFIFO should be read while execution, but we have enough ofifo
-  //   // depth so we can fetch out after execution.
-  //   ...
-  //   /////////////////////////////////////
+    //////// OFIFO READ ////////
+    // Ideally, OFIFO should be read while execution, but we have enough ofifo
+    // depth so we can fetch out after execution.
+   // ...
+    /////////////////////////////////////
 
 
-  // end  // end of kij loop
+  end  // end of kij loop
 
 
   // ////////// Accumulation /////////

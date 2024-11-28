@@ -1,4 +1,4 @@
-module corelet (clk, l0_in, l0_rd, l0_wr, reset);
+module corelet (clk, l0_in, l0_rd, l0_wr, reset, ififo_in, ififo_rd, ififo_wr);
   
   parameter row  = 8;
   parameter bw = 4;
@@ -7,14 +7,24 @@ module corelet (clk, l0_in, l0_rd, l0_wr, reset);
   
   input  clk;
   input [bw*col-1:0] l0_in;
+  input [bw*col-1:0] ififo_in;
+  input ififo_rd;
   input l0_rd;
+  input ififo_wr;
   input l0_wr;
   input reset;
 
   wire l0_ready;
   wire l0_full;
+  wire ififo_ready;
+  wire ififo_full;
+  
   reg l0_wr_q;
+  reg ififo_wr_q;
+
+
   wire  [row*bw-1:0] l0_out;
+  wire  [row*bw-1:0] ififo_out;
   
   ////////////// L0 Instance /////////////////////
 
@@ -31,10 +41,19 @@ module corelet (clk, l0_in, l0_rd, l0_wr, reset);
   );
  //////////////////////////////////////////////////////
 
-
-
-
  //////////////// IFIFO Instance ///////////////////////
+
+    l0 #(.bw(bw)) IFIFO_instance 
+  (
+        .clk(clk),
+        .in(ififo_in), 
+        .out(ififo_out), 
+        .rd(ififo_rd),
+        .wr(ififo_wr_q), 
+        .o_full(ififo_full), 
+        .reset(reset), 
+        .o_ready(ififo_ready)
+  );
 
 
  //////////////////////////////////////////////////////
@@ -65,6 +84,7 @@ module corelet (clk, l0_in, l0_rd, l0_wr, reset);
   always @(posedge clk)
   begin
      l0_wr_q <= l0_wr;
+     ififo_wr_q <= ififo_wr;
   end
 
 endmodule

@@ -43,9 +43,11 @@ assign l0_wr        = inst[2];
 assign execute      = inst[1];
 assign load         = inst[0];
 
-wire [127:0 ]Q_act;
+wire [31:0 ]Q_act;
+wire [31:0 ]Q_wt;
 
 wire [bw*col-1:0] l0_in;
+wire [bw*col-1:0] ififo_in;
 
 // Sram 1 Instantiation for L0
 
@@ -59,26 +61,40 @@ wire [bw*col-1:0] l0_in;
 
 /////////////////////////////////
 
+///////////////////////////////////////////////////
+
+// Sram 1 Instantiation for IFIFO
+
+ sram_128b_w2048 weight_sram (
+	.CLK(clk), 
+	.CEN(CEN_pmem), 
+	.WEN(WEN_pmem),
+   .A(A_pmem), 
+   .D(D_xmem), 
+   .Q(Q_wt));
+
+
+/////////////////////////////////
 
 /////////// Corelet Instantation /////////////////
 
-corelet inst1 (
+corelet core_inst1 (
     .clk(clk),
     .l0_in(l0_in),
     .l0_rd(l0_rd),
     .l0_wr(l0_wr),
+    .ififo_in(ififo_in),
+    .ififo_rd(ififo_rd),
+    .ififo_wr(ififo_wr),
     .reset(reset)
 
 );
 
-///////////////////////////////////////////////////
 
-// Sram 1 Instantiation for L1
-
-
-
-/////////////////////////////////
 assign l0_in = Q_act;
+assign ififo_in = Q_wt;
+
+
 always @(posedge clk) begin
 
    // l0_in <= Q_act;
