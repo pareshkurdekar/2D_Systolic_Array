@@ -121,7 +121,7 @@ initial begin
   $dumpfile("core_tb.vcd");
   $dumpvars(0,core_tb);
 
-  x_file = $fopen("activation_tile0.txt", "r");
+  x_file = $fopen("C:\\Users\\pares\\Desktop\\Systolic\\activation.txt", "r");
   // Following three lines are to remove the first three comment lines of the file
   x_scan_file = $fscanf(x_file,"%s", captured_data);
   x_scan_file = $fscanf(x_file,"%s", captured_data);
@@ -151,6 +151,17 @@ initial begin
 
   #0.5 clk = 1'b0;  WEN_xmem = 1;  CEN_xmem = 1; A_xmem = 0;
   #0.5 clk = 1'b1; 
+  
+  //   #0.5 clk = 1'b0;  WEN_xmem = 1;  CEN_xmem = 0; A_xmem = 1;
+  // #0.5 clk = 1'b1; 
+  // for (t=0; t<len_nij; t=t+1) begin  
+  //   #0.5 clk = 1'b0; A_xmem = A_xmem + 1;
+  //   #0.5 clk = 1'b1;  
+  // end
+
+  // #0.5 clk = 1'b0;  WEN_xmem = 1;  CEN_xmem = 1; A_xmem = 0;
+  // #0.5 clk = 1'b1; 
+
 
   $fclose(x_file);
   // /////////////////////////////////////////////////
@@ -211,7 +222,7 @@ initial begin
 
 
   //   /////// Kernel data writing to L0 ///////
-  //   ...
+    
   //   /////////////////////////////////////
 
 
