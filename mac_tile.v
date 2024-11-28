@@ -22,7 +22,7 @@ reg    [1:0] inst_q;
 reg    load_ready_q;
 
 assign out_s  = mac_out;
-assign out_e  = mac_out;
+assign out_e  = a_q;
 assign inst_e = inst_q;
 
 
@@ -45,7 +45,7 @@ always @ (posedge clk) begin
            c_q <= in_n;
        end
        if (inst_w[0] && load_ready_q ) begin
-          b_q  <= in_w[bw-1:0];
+          b_q  <= in_w;
           load_ready_q <= 0;
        end
        else if (!load_ready_q)

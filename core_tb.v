@@ -4,7 +4,10 @@
 
 
 `include "core.v"
-
+`include "mac_array.v"
+`include "mac_row.v"
+`include "mac_tile.v"
+`include "mac.v"
 `include "corelet.v"
 `include "sram_128b_w2048.v"
 `include "sram_32b_w2048.v"
@@ -28,8 +31,9 @@ parameter len_nij = 64;
 reg clk = 0;
 reg reset = 1;
 
-wire [35:0] inst_q; 
+wire [36:0] inst_q; 
 
+reg l0_rd_mode_q = 0;
 reg mode_q = 0;
 reg data_mode_q = 0;
 reg [1:0]  inst_w_q = 0; 
@@ -60,6 +64,7 @@ reg [1:0]  inst_w;
 reg [bw*row-1:0] D_xmem;
 reg [psum_bw*col-1:0] answer;
 
+reg l0_rd_mode;
 reg mode;
 reg data_mode;
 reg ofifo_rd;
@@ -82,6 +87,7 @@ integer captured_data;
 integer t, i, j, k, kij;
 integer error;
 
+assign inst_q[36] = l0_rd_mode_q;
 assign inst_q[35] = mode_q;
 assign inst_q[34] = data_mode_q;
 assign inst_q[33] = acc_q;
@@ -111,6 +117,7 @@ core  #(.bw(bw), .col(col), .row(row)) core_instance (
 
 initial begin 
 
+  l0_rd_mode = 0;
   mode = 0;
   data_mode = 0;
   inst_w   = 0; 
@@ -254,17 +261,20 @@ initial begin
     end
 
     #0.5 clk = 1'b0;   l0_rd = 0; l0_wr = 0; WEN_xmem = 1;  CEN_xmem = 1; A_pmem = 0;
-    #0.5 clk = 1'b1; 
-
-
-  
+    #0.5 clk = 1'b1;   
     /////////////////////////////////////
 
 
 
     /////// Kernel loading to PEs ///////
-    
-    
+
+    for (t=0; t<col; t=t+1) begin  
+
+      #0.5 clk = 1'b0;   l0_rd = 1; l0_wr = 0; l0_rd_mode = 1; load = 1; execute = 0;
+      #0.5 clk = 1'b1;   
+    end
+
+
     /////////////////////////////////////
   
 
@@ -284,28 +294,28 @@ initial begin
 
     /////// Activation data writing to L0 ///////
     
- // Writing into L0
+//  // Writing into L0
 
 
-  for (t=0; t<len_nij; t=t+1) begin  
+//   for (t=0; t<len_nij; t=t+1) begin  
 
-    #0.5 clk = 1'b0;   l0_rd = 0; l0_wr = 1; WEN_xmem = 1;  CEN_xmem = 0;if (t>0) A_xmem = A_xmem + 1; 
-    #0.5 clk = 1'b1;    
-  end
+//     #0.5 clk = 1'b0;   l0_rd = 0; l0_wr = 1; WEN_xmem = 1;  CEN_xmem = 0;if (t>0) A_xmem = A_xmem + 1; 
+//     #0.5 clk = 1'b1;    
+//   end
 
-  // Stop Writes & Reads
+//   // Stop Writes & Reads
 
-    #0.5 clk = 1'b0;   l0_rd = 0; l0_wr = 0; WEN_xmem = 1;  CEN_xmem = 1;
-    #0.5 clk = 1'b1;
+//     #0.5 clk = 1'b0;   l0_rd = 0; l0_wr = 0; WEN_xmem = 1;  CEN_xmem = 1;
+//     #0.5 clk = 1'b1;
   
 
-  // Wait for 10 cycles
-  for (t=0; t<10; t=t+1) begin  
+//   // Wait for 10 cycles
+//   for (t=0; t<10; t=t+1) begin  
 
-    #0.5 clk = 1'b0;  
-    #0.5 clk = 1'b1;   
+//     #0.5 clk = 1'b0;  
+//     #0.5 clk = 1'b1;   
        
-  end
+//   end
 
   // Reading from L0 for testing
 
@@ -421,6 +431,7 @@ always @ (posedge clk) begin
 
    
    inst_w_q   <= inst_w; 
+   l0_rd_mode_q <= l0_rd_mode;
    mode_q <= mode;
    data_mode_q <= data_mode;
    D_xmem_q   <= D_xmem;

@@ -1,6 +1,6 @@
 // Created by prof. Mingu Kang @VVIP Lab in UCSD ECE department
 // Please do not spread this code without permission 
-module l0 (clk, in, out, rd, wr, o_full, reset, o_ready);
+module l0 (clk, in, out, rd, l0_rd_mode, wr, o_full, reset, o_ready);
 
   parameter row  = 8;
   parameter bw = 4;
@@ -8,6 +8,7 @@ module l0 (clk, in, out, rd, wr, o_full, reset, o_ready);
   input  clk;
   input  wr;
   input  rd;
+  input l0_rd_mode;
   input  reset;
   input  [row*bw-1:0] in;
   output [row*bw-1:0] out;
@@ -45,20 +46,24 @@ module l0 (clk, in, out, rd, wr, o_full, reset, o_ready);
    else
 
       /////////////// version1: read all row at a time ////////////////
-     rd_en <= {row{rd}};
       ///////////////////////////////////////////////////////
+      if(l0_rd_mode)
+         rd_en <= {row{rd}};
+      else
+      begin
+         rd_en[0] <= rd;
+		   rd_en[1] <= rd_en[0];
+		   rd_en[2] <= rd_en[1];
+		   rd_en[3] <= rd_en[2];
+		   rd_en[4] <= rd_en[3];
+		   rd_en[5] <= rd_en[4];
+		   rd_en[6] <= rd_en[5];
+		   rd_en[7] <= rd_en[6];
 
+      end
 
 
       //////////////// version2: read 1 row at a time /////////////////
-//      rd_en[0] <= rd;
-//		rd_en[1] <= rd_en[0];
-//		rd_en[2] <= rd_en[1];
-//		rd_en[3] <= rd_en[2];
-//		rd_en[4] <= rd_en[3];
-//		rd_en[5] <= rd_en[4];
-//		rd_en[6] <= rd_en[5];
-//		rd_en[7] <= rd_en[6];
 		
       ///////////////////////////////////////////////////////
     end
