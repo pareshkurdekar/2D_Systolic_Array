@@ -22,7 +22,7 @@ parameter len_kij = 9;
 parameter len_onij = 16;
 parameter col = 8;
 parameter row = 8;
-parameter len_nij = 36;
+parameter len_nij = 64;
 
 reg clk = 0;
 reg reset = 1;
@@ -152,6 +152,8 @@ initial begin
   #0.5 clk = 1'b0;  WEN_xmem = 1;  CEN_xmem = 1; A_xmem = 0;
   #0.5 clk = 1'b1; 
   
+
+  // Can be used to test SRAM
   //   #0.5 clk = 1'b0;  WEN_xmem = 1;  CEN_xmem = 0; A_xmem = 1;
   // #0.5 clk = 1'b1; 
   // for (t=0; t<len_nij; t=t+1) begin  
@@ -161,7 +163,6 @@ initial begin
 
   // #0.5 clk = 1'b0;  WEN_xmem = 1;  CEN_xmem = 1; A_xmem = 0;
   // #0.5 clk = 1'b1; 
-
 
   $fclose(x_file);
   // /////////////////////////////////////////////////
@@ -222,7 +223,51 @@ initial begin
 
 
   //   /////// Kernel data writing to L0 ///////
-    
+ 
+ // Writing into L0
+
+
+  for (t=0; t<len_nij; t=t+1) begin  
+
+    #0.5 clk = 1'b0;   l0_rd = 0; l0_wr = 1; WEN_xmem = 1;  CEN_xmem = 0;if (t>0) A_xmem = A_xmem + 1; 
+    #0.5 clk = 1'b1;    
+  end
+
+  // Stop Writes & Reads
+
+    #0.5 clk = 1'b0;   l0_rd = 0; l0_wr = 0; WEN_xmem = 1;  CEN_xmem = 1;
+    #0.5 clk = 1'b1;
+  
+
+  // Wait for 10 cycles
+  for (t=0; t<10; t=t+1) begin  
+
+    #0.5 clk = 1'b0;  
+    #0.5 clk = 1'b1;   
+       
+  end
+
+  // Reading from L0 for testing
+
+  // for (t=0; t<len_nij; t=t+1) begin  
+
+  //   #0.5 clk = 1'b0;   l0_rd = 1; l0_wr = 0; WEN_xmem = 1;  CEN_xmem = 1;
+  //   #0.5 clk = 1'b1;   
+
+  // end
+  //   #0.5 clk = 1'b0;   l0_rd = 0; l0_wr = 0; WEN_xmem = 1;  CEN_xmem = 1;
+  //   #0.5 clk = 1'b1;   
+
+  // for (t=0; t<10; t=t+1) begin  
+
+  //   #0.5 clk = 1'b0;  
+  //   #0.5 clk = 1'b1;   
+       
+  // end
+
+
+
+  
   //   /////////////////////////////////////
 
 

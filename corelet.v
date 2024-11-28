@@ -1,35 +1,34 @@
-module corelet (clk, D, Q, CEN, WEN, A, reset);
-  input  clk;
-  input  WEN;
-  input reset;
-  input  CEN;
-  input  [127:0] D;
-  input  [10:0] A;
-  output [127:0] Q;
-
-
+module corelet (clk, l0_in, l0_rd, l0_wr, reset);
+  
   parameter row  = 8;
   parameter bw = 4;
   parameter col = 8; 
  
-  reg [bw*col-1:0] L0_in;
-  wire L0_rd;
-  reg L0_wr;
-  wire [row-1:0] L0_empty;
-  wire  [row*bw-1:0] L0_out;
+  
+  input  clk;
+  input [bw*col-1:0] l0_in;
+  input l0_rd;
+  input l0_wr;
+  input reset;
+
+  wire l0_ready;
+  wire l0_full;
+  reg l0_wr_q;
+  wire  [row*bw-1:0] l0_out;
   
   ////////////// L0 Instance /////////////////////
 
     l0 #(.bw(bw)) l0_instance 
   (
         .clk(clk),
-        .in(L0_in), 
-        .out(L0_out), 
-        .rd(L0_rd),
-        .wr(L0_wr), 
-        .o_full(L0_full), 
+        .in(l0_in), 
+        .out(l0_out), 
+        .rd(l0_rd),
+        .wr(l0_wr_q), 
+        .o_full(l0_full), 
         .reset(reset), 
-        .o_ready(L0_ready));
+        .o_ready(l0_ready)
+  );
  //////////////////////////////////////////////////////
 
 
@@ -65,8 +64,7 @@ module corelet (clk, D, Q, CEN, WEN, A, reset);
 
   always @(posedge clk)
   begin
-		L0_in <= Q;
-		L0_wr <= !CEN && WEN;
+     l0_wr_q <= l0_wr;
   end
 
 endmodule

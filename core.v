@@ -45,7 +45,7 @@ assign load         = inst[0];
 
 wire [127:0 ]Q_act;
 
-reg [bw*col-1:0] l0_in;
+wire [bw*col-1:0] l0_in;
 
 // Sram 1 Instantiation for L0
 
@@ -64,9 +64,10 @@ reg [bw*col-1:0] l0_in;
 
 corelet inst1 (
     .clk(clk),
-    .l0_in(l0_in)
+    .l0_in(l0_in),
     .l0_rd(l0_rd),
     .l0_wr(l0_wr),
+    .reset(reset)
 
 );
 
@@ -77,10 +78,10 @@ corelet inst1 (
 
 
 /////////////////////////////////
-
+assign l0_in = Q_act;
 always @(posedge clk) begin
 
-    l0_in <= Q_act;
+   // l0_in <= Q_act;
 
 end
 
