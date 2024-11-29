@@ -37,14 +37,16 @@ module mac_array (clk, reset, out_s, in_w, in_n, inst_w, valid);
   integer j;
 
   always @(posedge clk or posedge reset) begin    
-    inst_temp[1:0] <= inst_w; 
-    inst_temp[3:2] <= inst_temp [1:0];
-    inst_temp[5:4] <= inst_temp [3:2];
-    inst_temp[7:6] <= inst_temp [5:4];
-    inst_temp[9:8] <= inst_temp [7:6];
-    inst_temp[11:10] <= inst_temp [9:8];
-    inst_temp[13:12] <= inst_temp [11:10];
-    inst_temp[15:14] <= inst_temp [13:12];
+      
+      inst_temp <= {row{inst_w}};
+  //   inst_temp[1:0] <= inst_w; 
+  //   inst_temp[3:2] <= inst_temp [1:0];
+  //   inst_temp[5:4] <= inst_temp [3:2];
+  //   inst_temp[7:6] <= inst_temp [5:4];
+  //   inst_temp[9:8] <= inst_temp [7:6];
+  //   inst_temp[11:10] <= inst_temp [9:8];
+  //   inst_temp[13:12] <= inst_temp [11:10];
+  //   inst_temp[15:14] <= inst_temp [13:12];
   end
 
 endmodule
