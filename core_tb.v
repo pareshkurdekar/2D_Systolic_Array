@@ -31,8 +31,9 @@ parameter len_nij = 64;
 reg clk = 0;
 reg reset = 1;
 
-wire [36:0] inst_q; 
+wire [37:0] inst_q; 
 
+reg all_row_mode_q = 0;
 reg l0_rd_mode_q = 0;
 reg mode_q = 0;
 reg data_mode_q = 0;
@@ -64,6 +65,7 @@ reg [1:0]  inst_w;
 reg [bw*row-1:0] D_xmem;
 reg [psum_bw*col-1:0] answer;
 
+reg all_row_mode;
 reg l0_rd_mode;
 reg mode;
 reg data_mode;
@@ -87,6 +89,7 @@ integer captured_data;
 integer t, i, j, k, kij;
 integer error;
 
+assign inst_q[37] = all_row_mode_q;
 assign inst_q[36] = l0_rd_mode_q;
 assign inst_q[35] = mode_q;
 assign inst_q[34] = data_mode_q;
@@ -117,6 +120,7 @@ core  #(.bw(bw), .col(col), .row(row)) core_instance (
 
 initial begin 
 
+  all_row_mode = 0;
   l0_rd_mode = 0;
   mode = 0;
   data_mode = 0;
@@ -224,7 +228,7 @@ initial begin
 
     /////// Kernel data writing to memory ///////
 
-    A_xmem = 11'b10000000000;
+    //A_xmem = 11'b10000000000;
 
     for (t=0; t<col; t=t+1) begin  
       #0.5 clk = 1'b0;  w_scan_file = $fscanf(w_file,"%32b", D_xmem); WEN_pmem = 0; CEN_pmem = 0; if (t>0) A_pmem = A_pmem + 1; 
@@ -258,10 +262,10 @@ initial begin
     for (t=0; t<col; t=t+1) begin  
       #0.5 clk = 1'b0;   l0_rd = 0; l0_wr = 1; WEN_pmem = 1; CEN_pmem = 0; if (t>0) A_pmem = A_pmem + 1; 
       #0.5 clk = 1'b1;  
-            
+
     end
 
-    #0.5 clk = 1'b0;   l0_rd = 0; l0_wr = 0; WEN_xmem = 1;  CEN_xmem = 1; A_pmem = 0;
+    #0.5 clk = 1'b0;   l0_rd = 0; l0_wr = 0; WEN_pmem = 1;  CEN_pmem = 1; A_pmem = 0;
     #0.5 clk = 1'b1;   
     /////////////////////////////////////
 
@@ -295,28 +299,31 @@ initial begin
 
     /////// Activation data writing to L0 ///////
     
-//  // Writing into L0
+ // Writing into L0
+
+    #0.5 clk = 1'b0;  mode = 1; data_mode = 0;  // Send wt in wt stationary mode
+    #0.5 clk = 1'b1; 
 
 
-//   for (t=0; t<len_nij; t=t+1) begin  
+  for (t=0; t<len_nij; t=t+1) begin  
 
-//     #0.5 clk = 1'b0;   l0_rd = 0; l0_wr = 1; WEN_xmem = 1;  CEN_xmem = 0;if (t>0) A_xmem = A_xmem + 1; 
-//     #0.5 clk = 1'b1;    
-//   end
+    #0.5 clk = 1'b0;   l0_rd = 0; l0_wr = 1; WEN_xmem = 1;  CEN_xmem = 0;if (t>0) A_xmem = A_xmem + 1; 
+    #0.5 clk = 1'b1;    
+  end
 
-//   // Stop Writes & Reads
+  // Stop Writes & Reads
 
-//     #0.5 clk = 1'b0;   l0_rd = 0; l0_wr = 0; WEN_xmem = 1;  CEN_xmem = 1;
-//     #0.5 clk = 1'b1;
+    #0.5 clk = 1'b0;   l0_rd = 0; l0_wr = 0; WEN_xmem = 1;  CEN_xmem = 1; A_xmem = 0; 
+    #0.5 clk = 1'b1;
   
 
-//   // Wait for 10 cycles
-//   for (t=0; t<10; t=t+1) begin  
+  // Wait for 10 cycles
+  for (t=0; t<10; t=t+1) begin  
 
-//     #0.5 clk = 1'b0;  
-//     #0.5 clk = 1'b1;   
+    #0.5 clk = 1'b0;  
+    #0.5 clk = 1'b1;   
        
-//   end
+  end
 
   // Reading from L0 for testing
 
@@ -432,6 +439,7 @@ always @ (posedge clk) begin
 
    
    inst_w_q   <= inst_w; 
+   all_row_mode_q <= all_row_mode;
    l0_rd_mode_q <= l0_rd_mode;
    mode_q <= mode;
    data_mode_q <= data_mode;

@@ -1,4 +1,4 @@
-module corelet (clk, l0_in, l0_rd, l0_rd_mode, l0_wr, reset, ififo_in, ififo_rd, load, execute, ififo_wr);
+module corelet (clk, l0_in, l0_rd, l0_rd_mode, all_row_mode, mode, data_mode, l0_wr, reset, ififo_in, ififo_rd, load, execute, ififo_wr);
   
   parameter row  = 8;
   parameter bw = 4;
@@ -17,7 +17,10 @@ module corelet (clk, l0_in, l0_rd, l0_rd_mode, l0_wr, reset, ififo_in, ififo_rd,
   input load;
   input execute;
 
+  input all_row_mode;
   input l0_rd_mode;
+  input mode;
+  input data_mode;
 
   wire l0_ready;
   wire l0_full;
@@ -80,7 +83,9 @@ mac_array mac_array_inst (
   .clk(clk), 
   .reset(reset), 
   .out_s(out_s), 
-  .in_w(l0_out), 
+  .in_w(l0_out),
+  .mode(mode),
+  .data_mode(data_mode),
   .in_n(in_n), 
   .inst_w({execute, load}), 
   .valid(valid)
