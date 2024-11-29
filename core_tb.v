@@ -258,6 +258,7 @@ initial begin
     for (t=0; t<col; t=t+1) begin  
       #0.5 clk = 1'b0;   l0_rd = 0; l0_wr = 1; WEN_pmem = 1; CEN_pmem = 0; if (t>0) A_pmem = A_pmem + 1; 
       #0.5 clk = 1'b1;  
+            
     end
 
     #0.5 clk = 1'b0;   l0_rd = 0; l0_wr = 0; WEN_xmem = 1;  CEN_xmem = 1; A_pmem = 0;
@@ -268,11 +269,11 @@ initial begin
 
     /////// Kernel loading to PEs ///////
 
-    for (t=0; t<col; t=t+1) begin  
+   for (t=0; t<col; t=t+1) begin  
 
       #0.5 clk = 1'b0;   l0_rd = 1; l0_wr = 0; l0_rd_mode = 1; load = 1; execute = 0;
       #0.5 clk = 1'b1;   
-    end
+   end
 
 
     /////////////////////////////////////

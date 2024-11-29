@@ -40,7 +40,7 @@ always @ (posedge clk) begin
   end
   else begin
        inst_q[1]  <= inst_w[1];
-       if (inst_w[1]) begin
+       if (inst_w) begin
            a_q <= in_w;
            c_q <= in_n;
        end
