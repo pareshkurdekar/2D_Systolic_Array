@@ -26,7 +26,7 @@ parameter len_kij = 9;
 parameter len_onij = 16;
 parameter col = 8;
 parameter row = 8;
-parameter len_nij = 64;
+parameter len_nij = 36;
 
 reg clk = 0;
 reg reset = 1;
@@ -350,7 +350,19 @@ initial begin
 
 
     /////// Execution ///////
-    //...
+    // Load L0 and Execute simultaneously
+
+    for (t=0; t<len_nij; t=t+1) begin  
+
+      #0.5 clk = 1'b0;   l0_rd = 1; l0_wr = 0; l0_rd_mode = 0; l0_rd_mode = 0; load = 1;execute = 1;
+      #0.5 clk = 1'b1;   
+
+   end
+
+      #0.5 clk = 1'b0;   l0_rd = 0; l0_wr = 0; l0_rd_mode = 0; load = 0; execute = 0;
+      #0.5 clk = 1'b1;   
+
+
     /////////////////////////////////////
 
 
