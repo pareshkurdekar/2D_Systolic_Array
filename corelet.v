@@ -1,4 +1,4 @@
-module corelet (clk, l0_in, l0_rd, l0_rd_mode, all_row_mode, mode, data_mode, l0_wr, reset, ififo_in, ififo_rd, load, execute, ififo_wr);
+module corelet (clk, l0_in, l0_rd, mode, data_mode, l0_wr, reset, ififo_in, ififo_rd, load, execute, ififo_wr);
   
   parameter row  = 8;
   parameter bw = 4;
@@ -17,8 +17,6 @@ module corelet (clk, l0_in, l0_rd, l0_rd_mode, all_row_mode, mode, data_mode, l0
   input load;
   input execute;
 
-  input all_row_mode;
-  input l0_rd_mode;
   input mode;
   input data_mode;
 
@@ -42,7 +40,6 @@ module corelet (clk, l0_in, l0_rd, l0_rd_mode, all_row_mode, mode, data_mode, l0
         .in(l0_in), 
         .out(l0_out), 
         .rd(l0_rd),
-        .l0_rd_mode(l0_rd_mode),
         .wr(l0_wr_q), 
         .o_full(l0_full), 
         .reset(reset), 
@@ -58,7 +55,6 @@ module corelet (clk, l0_in, l0_rd, l0_rd_mode, all_row_mode, mode, data_mode, l0
         .in(ififo_in), 
         .out(ififo_out), 
         .rd(ififo_rd),
-        .l0_rd_mode(1'b0),
         .wr(ififo_wr_q), 
         .o_full(ififo_full), 
         .reset(reset), 

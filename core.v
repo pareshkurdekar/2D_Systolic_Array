@@ -8,7 +8,7 @@ parameter psum_bw = 16;
 
 input clk;
 input reset;
-input [37:0] inst; 
+input [35:0] inst; 
 output ofifo_valid;
 input [bw*row-1:0]D_xmem;
 output [col*psum_bw-1:0] sfp_out;
@@ -29,10 +29,7 @@ wire load;
 wire acc;
 wire mode;
 wire data_mode;
-wire all_row_mode;
 
-assign all_row_mode   = inst[37];
-assign l0_rd_mode   = inst[36];
 assign mode         = inst[35];
 assign data_mode    = inst[34];
 assign acc          = inst[33];
@@ -89,8 +86,6 @@ corelet core_inst1 (
     .clk(clk),
     .l0_in(l0_in),
     .l0_rd(l0_rd),
-    .l0_rd_mode(l0_rd_mode),
-    .all_row_mode(all_row_mode),
     .mode(mode),
     .data_mode(data_mode),
     .l0_wr(l0_wr),
