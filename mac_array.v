@@ -41,7 +41,7 @@ module mac_array (clk, reset, out_s, in_w, in_n, mode, data_mode, inst_w, valid)
 
   integer j;
 
-  always @(posedge clk or posedge reset) begin    
+  always @(posedge clk ) begin    
       
       if(data_mode)
         inst_temp <= {row{inst_w}};

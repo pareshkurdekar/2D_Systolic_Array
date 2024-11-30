@@ -1,4 +1,5 @@
-module corelet (clk, l0_in, l0_rd, mode, data_mode, l0_wr, reset, ififo_in, ififo_rd, load, execute, ififo_wr);
+module corelet (clk, l0_in, l0_rd, l0_rd_mode, all_row_mode, mode, data_mode, ofifo_rd, l0_wr, reset, 
+                ififo_in, ififo_rd, load, execute, ififo_wr, ofifo_out);
   
   parameter row  = 8;
   parameter bw = 4;
@@ -16,7 +17,11 @@ module corelet (clk, l0_in, l0_rd, mode, data_mode, l0_wr, reset, ififo_in, ifif
   input reset;
   input load;
   input execute;
+  input ofifo_rd;
+  output [col*psum_bw-1: 0]  ofifo_out;
 
+  input all_row_mode;
+  input l0_rd_mode;
   input mode;
   input data_mode;
 
@@ -24,6 +29,7 @@ module corelet (clk, l0_in, l0_rd, mode, data_mode, l0_wr, reset, ififo_in, ifif
   wire l0_full;
   wire ififo_ready;
   wire ififo_full;
+  
   
   reg l0_wr_q;
   reg ififo_wr_q;
@@ -40,6 +46,7 @@ module corelet (clk, l0_in, l0_rd, mode, data_mode, l0_wr, reset, ififo_in, ifif
         .in(l0_in), 
         .out(l0_out), 
         .rd(l0_rd),
+        .l0_rd_mode(l0_rd_mode),
         .wr(l0_wr_q), 
         .o_full(l0_full), 
         .reset(reset), 
@@ -55,6 +62,7 @@ module corelet (clk, l0_in, l0_rd, mode, data_mode, l0_wr, reset, ififo_in, ifif
         .in(ififo_in), 
         .out(ififo_out), 
         .rd(ififo_rd),
+        .l0_rd_mode(1'b0),
         .wr(ififo_wr_q), 
         .o_full(ififo_full), 
         .reset(reset), 
@@ -69,6 +77,7 @@ wire [row*bw-1:0] in_w;
 wire [psum_bw*col-1:0] in_n;
 wire [1:0] inst_w;
 wire [col-1:0] valid;
+reg [col-1:0] valid_q;
 
 
 
@@ -95,6 +104,31 @@ mac_array mac_array_inst (
 
  //////////////// Ofifo Instance ///////////////////////
 
+////////
+
+
+
+ // wire [col*psum_bw-1: 0] ofifo_out; 
+  wire ofifo_valid;   
+  wire ofifo_full; 
+
+
+
+ //////////////// Ofifo Instance ///////////////////////
+
+
+
+ofifo ofifo_inst (
+  .clk(clk), 
+  .in(out_s), 
+  .out(ofifo_out), 
+  .rd(ofifo_rd), 
+  .wr(valid_q), 
+  .o_full(ofifo_full), 
+  .reset(reset), 
+  .o_ready(ofifo_ready), 
+  .o_valid(ofifo_valid)
+);
 
 //////////////////////////////////////////////////////////
 
@@ -110,6 +144,8 @@ mac_array mac_array_inst (
   begin
      l0_wr_q <= l0_wr;
      ififo_wr_q <= ififo_wr;
+
+     valid_q <= valid;
   end
 
 endmodule
