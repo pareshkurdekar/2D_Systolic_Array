@@ -34,14 +34,14 @@ module mac_array (clk, reset, out_s, in_w, in_n, mode, data_mode, inst_w, valid)
       );
     end
 
-  assign psum_temp[psum_bw*col-1:0] = 0;
+  // assign psum_temp[psum_bw*col-1:0] = 0;
 
   assign out_s = psum_temp[psum_bw*col*(row+1)-1:psum_bw*col*row];
   assign valid = valid_temp[row-1];
 
   integer j;
 
-  always @(posedge clk or posedge reset) begin    
+  always @(posedge clk ) begin    
       
       if(data_mode)
         inst_temp <= {row{inst_w}};

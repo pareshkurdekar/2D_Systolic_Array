@@ -1,4 +1,5 @@
-module corelet (clk, l0_in, l0_rd, l0_rd_mode, all_row_mode, mode, data_mode, l0_wr, reset, ififo_in, ififo_rd, load, execute, ififo_wr);
+module corelet (clk, l0_in, l0_rd, l0_rd_mode, all_row_mode, mode, data_mode, l0_wr, Q_out, acc, sfp_out,
+                reset, ififo_in, ififo_rd, load, execute, ififo_wr, ofifo_out, ofifo_rd, output_loading_mode);
   
   parameter row  = 8;
   parameter bw = 4;
@@ -14,13 +15,18 @@ module corelet (clk, l0_in, l0_rd, l0_rd_mode, all_row_mode, mode, data_mode, l0
   input ififo_wr;
   input l0_wr;
   input reset;
+  input acc;
   input load;
+  input [127:0] Q_out;
   input execute;
-
+  input output_loading_mode;
   input all_row_mode;
   input l0_rd_mode;
   input mode;
   input data_mode;
+  output [127:0] sfp_out;
+  input ofifo_rd;
+  output [col*psum_bw-1: 0]  ofifo_out;
 
   wire l0_ready;
   wire l0_full;
@@ -69,10 +75,12 @@ module corelet (clk, l0_in, l0_rd, l0_rd_mode, all_row_mode, mode, data_mode, l0
  //////////////////////////////////////////////////////
 
 wire [psum_bw*col-1:0] out_s;
+
 wire [row*bw-1:0] in_w;
 wire [psum_bw*col-1:0] in_n;
 wire [1:0] inst_w;
 wire [col-1:0] valid;
+reg [col-1:0] valid_q;
 
 
 
@@ -86,7 +94,7 @@ mac_array mac_array_inst (
   .in_w(l0_out),
   .mode(mode),
   .data_mode(data_mode),
-  .in_n(in_n), 
+  .in_n(128'b0), 
   .inst_w({execute, load}), 
   .valid(valid)
   
@@ -97,7 +105,26 @@ mac_array mac_array_inst (
 
 
 
+ // wire [col*psum_bw-1: 0] ofifo_out; 
+  wire ofifo_valid;   
+  wire ofifo_full; 
+
+
+
  //////////////// Ofifo Instance ///////////////////////
+
+
+ofifo ofifo_inst (
+  .clk(clk), 
+  .in(out_s), 
+  .out(ofifo_out), 
+  .rd(ofifo_rd), 
+  .wr(valid_q), 
+  .o_full(ofifo_full), 
+  .reset(reset), 
+  .o_ready(ofifo_ready), 
+  .o_valid(ofifo_valid)
+);
 
 
 //////////////////////////////////////////////////////////
@@ -105,6 +132,15 @@ mac_array mac_array_inst (
 
 
 /////////////////////// SFP ///////////////////////////////
+reg acc_q;
+sfp_row sfp_inst (
+    .clk(clk),    // Clock signal
+    .reset(reset),  // Reset signal
+    .acc(acc_q),    // Accumulate enable
+    .in(Q_out), // Input data bus
+    .out(sfp_out) // Output data bus after ReLU
+
+);
 
 //////////////////////////////////////////////////////////
 
@@ -112,8 +148,11 @@ mac_array mac_array_inst (
 
   always @(posedge clk)
   begin
-     l0_wr_q <= l0_wr;
-     ififo_wr_q <= ififo_wr;
+    l0_wr_q <= l0_wr; 
+    ififo_wr_q <= ififo_wr;
+    acc_q <= acc;
+    valid_q <= valid;
+
   end
 
 endmodule
