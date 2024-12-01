@@ -5,9 +5,9 @@ module sram_128b_w2048 (CLK, D, Q, CEN, WEN, A);
   input  CLK;
   input  WEN;
   input  CEN;
-  input  [127:0] D;
+  input  [31:0] D;
   input  [10:0] A;
-  output [127:0] Q;
+  output [31:0] Q;
   parameter num = 2048;
 
   reg [127:0] memory [num-1:0];

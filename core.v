@@ -8,19 +8,13 @@ parameter psum_bw = 16;
 
 input clk;
 input reset;
-input [51:0] inst; 
+input [37:0] inst; 
 output ofifo_valid;
 input [bw*row-1:0]D_xmem;
 output [col*psum_bw-1:0] sfp_out;
 
 wire CEN_xmem;
-wire WEN_xmem;
 wire [10:0] A_xmem;
-
-wire CEN_omem;
-wire WEN_omem;
-wire [10:0] A_omem;
-
 wire CEN_pmem ;
 wire WEN_pmem;
 wire [10:0] A_pmem;
@@ -35,10 +29,6 @@ wire acc;
 wire mode;
 wire data_mode;
 wire all_row_mode;
-
-assign CEN_omem     = inst[50];
-assign WEN_omem     = inst[49];
-assign A_omem       = inst[48:38];
 
 assign all_row_mode   = inst[37];
 assign l0_rd_mode   = inst[36];
@@ -61,19 +51,16 @@ assign load         = inst[0];
 
 wire [31:0 ]Q_act;
 wire [31:0 ]Q_wt;
-wire [127:0 ]Q_out;
 
 reg [bw*col-1:0] l0_in;
-wire [bw*col-1:0] ififo_in;
+reg [bw*col-1:0] ififo_in;
 
-
-wire [col*psum_bw-1: 0] ofifo_out; 
 // Sram 1 Instantiation for L0
 
- sram_32b_w2048 activation_sram (
+ sram_128b_w2048 activation_sram (
 	.CLK(clk), 
 	.CEN(CEN_xmem), 
-	.WEN(WEN_xmem),
+	.WEN(WEN_xmem & !l0_full),
    .A(A_xmem), 
    .D(D_xmem), 
    .Q(Q_act));
@@ -82,59 +69,18 @@ wire [col*psum_bw-1: 0] ofifo_out;
 
 ///////////////////////////////////////////////////
 
-// Sram Instantiation for IFIFO
+// Sram 1 Instantiation for IFIFO
 
- sram_32b_w2048 weight_sram (
+ sram_128b_w2048 weight_sram (
 	.CLK(clk), 
 	.CEN(CEN_pmem), 
-	.WEN(WEN_pmem),
+	.WEN(WEN_pmem & !ififo_full),
    .A(A_pmem), 
    .D(D_xmem), 
    .Q(Q_wt));
 
-reg [col*psum_bw-1: 0] ofifo_out_temp;
-reg [15:0] sram_in;
-reg ofifo_rd_q;
-/////////////////////////////////
-//reg [11:0] A_omem;
-// always @(posedge clk)
-// begin
-//     ofifo_rd_q <= ofifo_rd;
-//    if(ofifo_rd_q)
-//         ofifo_out_temp <= ofifo_out; 
-    
-//         if(!CEN_omem && !WEN_omem)
-//         begin
-//     //        A_omem <= A_omem + 1'd1;
-//             sram_in <= ofifo_out_temp[15:0];
-//            ofifo_out_temp[15:0] <= ofifo_out_temp[31:16];
-//             ofifo_out_temp[31:16] <= ofifo_out_temp[47:32];
-//             ofifo_out_temp[47:32] <= ofifo_out_temp[63:48];
-//             ofifo_out_temp[63:48] <= ofifo_out_temp[79:64];
-//             ofifo_out_temp[79:64] <= ofifo_out_temp[95:80];
-//             ofifo_out_temp[95:80] <= ofifo_out_temp[111:96];
-//             ofifo_out_temp[111:96] <= ofifo_out_temp[127:112];
-
-//         end
-
-// end
-
-
-  
-
-// Sram Instantiation for OFIFO
-  parameter num = 3000;
- sram_128b_w2048 ofifo_sram (
-	.CLK(clk), 
-	.CEN(CEN_omem), 
-	.WEN(WEN_omem),
-   .A(A_omem), 
-   .D(ofifo_out), 
-   .Q(Q_out));
-
 
 /////////////////////////////////
-
 
 /////////// Corelet Instantation /////////////////
 
@@ -147,14 +93,17 @@ corelet core_inst1 (
     .mode(mode),
     .data_mode(data_mode),
     .l0_wr(l0_wr),
+    .ofifo_rd(ofifo_rd),
     .ififo_in(ififo_in),
     .ififo_rd(ififo_rd),
     .ififo_wr(ififo_wr),
-    .ofifo_out(ofifo_out),
-    .ofifo_rd(ofifo_rd),
     .load(load),
     .execute(execute),
-    .reset(reset)
+    .reset(reset),
+    .ififo_ready(ififo_ready),
+    .l0_ready(l0_ready),
+    .ififo_full(ififo_full),
+    .l0_full(l0_full)
 
 );
 
@@ -173,8 +122,10 @@ begin
     end
     else       // Output Stationary
     begin
-    
-
+        l0_in = Q_act;      // L0 will load the activation
+        ififo_in = Q_wt;    // IFIFO will load the weights
+        // Both these loads will happen ip ch by ip ch
+        
     end
 end
 // assign l0_in = Q_act;

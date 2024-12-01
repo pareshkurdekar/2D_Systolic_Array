@@ -1,3 +1,4 @@
+// module mac_array (clk, reset, out_s, in_w, in_n_wt, in_n_psum, mode, data_mode, inst_w, valid);
 module mac_array (clk, reset, out_s, in_w, in_n, mode, data_mode, inst_w, valid);
 
   parameter bw = 4;
@@ -30,18 +31,17 @@ module mac_array (clk, reset, out_s, in_w, in_n, mode, data_mode, inst_w, valid)
         .in_w(in_w[bw*i-1:bw*(i-1)]),
         .inst_w(inst_temp[2*i-1:2*(i-1)]),
         .reset(reset),
-        .valid(valid_temp[i-1])
+        .valid(valid_temp[i-1]),
+        .mode(mode)
       );
     end
-
-  assign psum_temp[psum_bw*col-1:0] = 0;
 
   assign out_s = psum_temp[psum_bw*col*(row+1)-1:psum_bw*col*row];
   assign valid = valid_temp[row-1];
 
   integer j;
 
-  always @(posedge clk ) begin    
+  always @(posedge clk or posedge reset) begin    
       
       if(data_mode)
         inst_temp <= {row{inst_w}};

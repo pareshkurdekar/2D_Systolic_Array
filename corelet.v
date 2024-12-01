@@ -1,5 +1,4 @@
-module corelet (clk, l0_in, l0_rd, l0_rd_mode, all_row_mode, mode, data_mode, ofifo_rd, l0_wr, reset, 
-                ififo_in, ififo_rd, load, execute, ififo_wr, ofifo_out);
+module corelet (clk, l0_in, l0_rd, l0_rd_mode, ofifo_rd, all_row_mode, mode, l0_ready, l0_full,data_mode, ififo_ready, ififo_full, l0_wr, reset, ififo_in, ififo_rd, load, execute, ififo_wr);
   
   parameter row  = 8;
   parameter bw = 4;
@@ -17,22 +16,29 @@ module corelet (clk, l0_in, l0_rd, l0_rd_mode, all_row_mode, mode, data_mode, of
   input reset;
   input load;
   input execute;
-  input ofifo_rd;
-  output [col*psum_bw-1: 0]  ofifo_out;
+  inout ofifo_rd;
+  output ififo_ready;
+  output l0_ready;
+
+    output ififo_full;
+  output l0_full;
+
 
   input all_row_mode;
   input l0_rd_mode;
   input mode;
   input data_mode;
 
-  wire l0_ready;
+  //wire l0_ready;
   wire l0_full;
-  wire ififo_ready;
+  //wire ififo_ready;
   wire ififo_full;
   
-  
   reg l0_wr_q;
+
+  reg l0_rd_q;
   reg ififo_wr_q;
+  reg ififo_rd_q;
 
 
   wire  [row*bw-1:0] l0_out;
@@ -45,7 +51,7 @@ module corelet (clk, l0_in, l0_rd, l0_rd_mode, all_row_mode, mode, data_mode, of
         .clk(clk),
         .in(l0_in), 
         .out(l0_out), 
-        .rd(l0_rd),
+        .rd(l0_rd_q),
         .l0_rd_mode(l0_rd_mode),
         .wr(l0_wr_q), 
         .o_full(l0_full), 
@@ -61,8 +67,8 @@ module corelet (clk, l0_in, l0_rd, l0_rd_mode, all_row_mode, mode, data_mode, of
         .clk(clk),
         .in(ififo_in), 
         .out(ififo_out), 
-        .rd(ififo_rd),
-        .l0_rd_mode(1'b0),
+        .rd(ififo_rd_q),
+        .l0_rd_mode(1'b0), // row by row 
         .wr(ififo_wr_q), 
         .o_full(ififo_full), 
         .reset(reset), 
@@ -77,10 +83,10 @@ wire [row*bw-1:0] in_w;
 wire [psum_bw*col-1:0] in_n;
 wire [1:0] inst_w;
 wire [col-1:0] valid;
-reg [col-1:0] valid_q;
 
-
-
+wire [psum_bw*col-1:0] ififo_out_temp;
+assign ififo_out_temp = { {12'b0,ififo_out[31:28]},{12'b0,ififo_out[27:24]},{12'b0,ififo_out[23:20]},{12'b0,ififo_out[19:16]},{12'b0,ififo_out[15:12]},{12'b0,ififo_out[11:8]},{12'b0,ififo_out[7:4]},{12'b0,ififo_out[3:0]}};
+assign in_n = mode ? 0 : ififo_out_temp;
 
  //////////////// Mac Array Instance ///////////////////
 
@@ -100,33 +106,22 @@ mac_array mac_array_inst (
 
  /////////////////////////////////////////////////////
 
-
-
- //////////////// Ofifo Instance ///////////////////////
-
-////////
-
-
-
- // wire [col*psum_bw-1: 0] ofifo_out; 
-  wire ofifo_valid;   
+  wire [col*psum_bw-1: 0] ofifo_out; 
+  // wire ofifo_rd; 
+  wire ofifo_valid; 
   wire ofifo_full; 
 
-
-
  //////////////// Ofifo Instance ///////////////////////
-
-
 
 ofifo ofifo_inst (
   .clk(clk), 
   .in(out_s), 
   .out(ofifo_out), 
   .rd(ofifo_rd), 
-  .wr(valid_q), 
+  .wr(valid), 
   .o_full(ofifo_full), 
   .reset(reset), 
-  .o_ready(ofifo_ready), 
+  .o_ready(ofifo_rd), 
   .o_valid(ofifo_valid)
 );
 
@@ -143,9 +138,11 @@ ofifo ofifo_inst (
   always @(posedge clk)
   begin
      l0_wr_q <= l0_wr;
-     ififo_wr_q <= ififo_wr;
+     l0_rd_q <= l0_rd;
 
-     valid_q <= valid;
+     ififo_wr_q <= ififo_wr;
+     ififo_rd_q <= ififo_rd;
+
   end
 
 endmodule
