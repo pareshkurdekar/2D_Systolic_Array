@@ -37,8 +37,7 @@ module sfp_row #(
                 .psum_bw(psum_bw)
             ) relu_instance (
                 .in_relu(out_temp[psum_bw*(i+1)-1 : psum_bw*i]),
-                .out_relu(out[psum_bw*(i+1)-1 : psum_bw*i]),
-		.reset(reset)
+                .out_relu(out[psum_bw*(i+1)-1 : psum_bw*i])
             );
         end
     endgenerate
