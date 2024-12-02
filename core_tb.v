@@ -3,20 +3,20 @@
 `timescale 1ns/1ps
 
 
-`include "core.v"
-`include "mac_array.v"
-`include "mac_row.v"
-`include "mac_tile.v"
-`include "mac.v"
-`include "corelet.v"
-`include "sram_128b_w2048.v"
-`include "sram_32b_w2048.v"
-`include "fifo_depth64.v"
-`include "fifo_mux_16_1.v"
-`include "fifo_mux_8_1.v"
-`include "fifo_mux_2_1.v"
-`include "l0.v"
-`include "ofifo.v"
+//`include "./verilog/core.v"
+//`include "./verilog/mac_array.v"
+//`include "./verilog/mac_row.v"
+//`include "./verilog/mac_tile.v"
+//`include "./verilog/mac.v"
+//`include "./verilog/corelet.v"
+//`include "./verilog/sram_128b_w2048.v"
+//`include "./verilog/sram_32b_w2048.v"
+//`include "./verilog/fifo_depth64.v"
+//`include "./verilog/fifo_mux_16_1.v"
+//`include "./verilog/fifo_mux_8_1.v"
+//`include "./verilog/fifo_mux_2_1.v"
+//`include "./verilog/l0.v"
+
 
 module core_tb;
 
@@ -31,14 +31,11 @@ parameter len_nij = 36;
 reg clk = 0;
 reg reset = 1;
 
-wire [51:0] inst_q; 
+wire [48:0] inst_q; 
 
-reg all_row_mode_q = 0;
-reg l0_rd_mode_q = 0;
 reg mode_q = 0;
 reg data_mode_q = 0;
 reg [1:0]  inst_w_q = 0; 
-
 reg [bw*row-1:0] D_xmem_q = 0;
 reg CEN_xmem = 1;
 reg WEN_xmem = 1;
@@ -78,8 +75,6 @@ reg [1:0]  inst_w;
 reg [bw*row-1:0] D_xmem;
 reg [psum_bw*col-1:0] answer;
 
-reg all_row_mode;
-reg l0_rd_mode;
 reg mode;
 reg data_mode;
 reg ofifo_rd;
@@ -102,12 +97,9 @@ integer captured_data;
 integer t, i, j, k, kij;
 integer error;
 
-assign inst_q[50] = CEN_omem_q;
-assign inst_q[49] = WEN_omem_q;
-assign inst_q[48:38] = A_omem_q;
-
-assign inst_q[37] = all_row_mode_q;
-assign inst_q[36] = l0_rd_mode_q;
+assign inst_q[48] = CEN_omem_q;
+assign inst_q[47] = WEN_omem_q;
+assign inst_q[46:36] = A_omem_q;
 assign inst_q[35] = mode_q;
 assign inst_q[34] = data_mode_q;
 assign inst_q[33] = acc_q;
@@ -130,15 +122,13 @@ core  #(.bw(bw), .col(col), .row(row)) core_instance (
 	.clk(clk), 
 	.inst(inst_q),
 	.ofifo_valid(ofifo_valid),
-  .D_xmem(D_xmem_q), 
-  .sfp_out(sfp_out), 
+        .D_xmem(D_xmem_q), 
+        .sfp_out(sfp_out), 
 	.reset(reset)); 
 
 
 initial begin 
 
-  all_row_mode = 0;
-  l0_rd_mode = 0;
   mode = 0;
   data_mode = 0;
   inst_w   = 0; 
@@ -157,7 +147,7 @@ initial begin
   $dumpfile("core_tb.vcd");
   $dumpvars(0,core_tb);
 
-  x_file = $fopen("C:\\Users\\pares\\Desktop\\Systolic\\activation.txt", "r");
+  x_file = $fopen("./activation.txt", "r");
   // Following three lines are to remove the first three comment lines of the file
   x_scan_file = $fscanf(x_file,"%s", captured_data);
   x_scan_file = $fscanf(x_file,"%s", captured_data);
@@ -292,7 +282,7 @@ initial begin
 
    for (t=0; t<col; t=t+1) begin  
 
-      #0.5 clk = 1'b0;   l0_rd = 1; l0_wr = 0; l0_rd_mode = 1; load = 1; execute = 0;
+      #0.5 clk = 1'b0;   l0_rd = 1; l0_wr = 0; load = 1; execute = 0;
       #0.5 clk = 1'b1;   
    end
 
@@ -371,12 +361,12 @@ initial begin
 
     for (t=0; t<len_nij; t=t+1) begin  
 
-      #0.5 clk = 1'b0;   l0_rd = 1; l0_wr = 0; l0_rd_mode = 0; l0_rd_mode = 0; load = 1;execute = 1;
+      #0.5 clk = 1'b0;   l0_rd = 1; l0_wr = 0; load = 1;execute = 1;
       #0.5 clk = 1'b1;   
 
    end
 
-      #0.5 clk = 1'b0;   l0_rd = 0; l0_wr = 0; l0_rd_mode = 0; load = 0; execute = 0;
+      #0.5 clk = 1'b0;   l0_rd = 0; l0_wr = 0; load = 0; execute = 0;
       #0.5 clk = 1'b1;   
 
   for (t=0; t<35; t=t+1) begin  
@@ -394,7 +384,7 @@ initial begin
 
     //////// OFIFO READ ////////
     // Ideally, OFIFO should be read while execution, but we have enough ofifo
-    // depth so we can fetch out after execution
+    // depth so we can fetch out after execution.
 
       #0.5 clk = 1'b0;   ofifo_rd = 1; 
       #0.5 clk = 1'b1;   
@@ -490,8 +480,6 @@ always @ (posedge clk) begin
 
    
    inst_w_q   <= inst_w; 
-   all_row_mode_q <= all_row_mode;
-   l0_rd_mode_q <= l0_rd_mode;
    mode_q <= mode;
    data_mode_q <= data_mode;
    D_xmem_q   <= D_xmem;
@@ -501,7 +489,6 @@ always @ (posedge clk) begin
    A_omem_q   <= A_omem;
    CEN_omem_q <= CEN_omem;
    WEN_omem_q <= WEN_omem;
-
 
    A_pmem_q   <= A_pmem;
    CEN_pmem_q <= CEN_pmem;

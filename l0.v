@@ -1,6 +1,6 @@
 // Created by prof. Mingu Kang @VVIP Lab in UCSD ECE department
 // Please do not spread this code without permission 
-module l0 (clk, in, out, rd, l0_rd_mode, wr, o_full, reset, o_ready);
+module l0 (clk, in, out, rd, data_mode, wr, o_full, reset, o_ready);
 
   parameter row  = 8;
   parameter bw = 4;
@@ -8,7 +8,7 @@ module l0 (clk, in, out, rd, l0_rd_mode, wr, o_full, reset, o_ready);
   input  clk;
   input  wr;
   input  rd;
-  input l0_rd_mode;
+  input data_mode;
   input  reset;
   input  [row*bw-1:0] in;
   output [row*bw-1:0] out;
@@ -21,12 +21,13 @@ module l0 (clk, in, out, rd, l0_rd_mode, wr, o_full, reset, o_ready);
   
   genvar i;
 
-  assign o_ready = empty[0] | empty[1] | empty[2] | empty[3] | empty[4] | empty[5] | empty[6] | empty[7] ;
-  assign o_full  = full[0] | full[1] | full [2] | full[3] | full[4] | full[5] | full[6] | full[7] ;
+  assign o_ready = |empty;
+  assign o_full = |full;
 
   generate
   for (i=0; i<row ; i=i+1) begin : row_num
-      fifo_depth64 #(.bw(bw)) fifo_instance (
+      fifo_depth16 #(.bw(bw)) fifo_instance (
+      //fifo_depth64 #(.bw(bw)) fifo_instance (
 	 .rd_clk(clk),
 	 .wr_clk(clk),
 	 .rd(rd_en[i]),
@@ -37,6 +38,7 @@ module l0 (clk, in, out, rd, l0_rd_mode, wr, o_full, reset, o_ready);
 	 .out(out[bw*(i+1) - 1: i*bw]),
          .reset(reset));
   end
+
   endgenerate
 
   always @ (posedge clk) begin
@@ -46,25 +48,25 @@ module l0 (clk, in, out, rd, l0_rd_mode, wr, o_full, reset, o_ready);
    else
 
       /////////////// version1: read all row at a time ////////////////
+      if(data_mode)
+        //rd_en <= {row{rd}};
+ 	if (rd) begin
+        	rd_en <= {row{1'b1}};
+        end else begin
+        	rd_en <= {row{1'b0}};
       ///////////////////////////////////////////////////////
-      if(l0_rd_mode)
-         rd_en <= {row{rd}};
-      else
-      begin
-         rd_en[0] <= rd;
-		   rd_en[1] <= rd_en[0];
-		   rd_en[2] <= rd_en[1];
-		   rd_en[3] <= rd_en[2];
-		   rd_en[4] <= rd_en[3];
-		   rd_en[5] <= rd_en[4];
-		   rd_en[6] <= rd_en[5];
-		   rd_en[7] <= rd_en[6];
-
-      end
-
-
+      end else begin
       //////////////// version2: read 1 row at a time /////////////////
-		
+	 if (rd) begin
+                    rd_en <= {rd_en[row-2:0], rd_en[row-1]};
+                    // Rotate rd_en to enable one row at a time
+                    if (rd_en == {row{1'b0}}) begin
+                        rd_en[0] <= 1'b1;
+                    end
+                end else begin
+                    rd_en <= {row{1'b0}};
+                end
+      end
       ///////////////////////////////////////////////////////
     end
 

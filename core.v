@@ -8,7 +8,7 @@ parameter psum_bw = 16;
 
 input clk;
 input reset;
-input [51:0] inst; 
+input [48:0] inst; 
 output ofifo_valid;
 input [bw*row-1:0]D_xmem;
 output [col*psum_bw-1:0] sfp_out;
@@ -34,14 +34,10 @@ wire load;
 wire acc;
 wire mode;
 wire data_mode;
-wire all_row_mode;
 
-assign CEN_omem     = inst[50];
-assign WEN_omem     = inst[49];
-assign A_omem       = inst[48:38];
-
-assign all_row_mode   = inst[37];
-assign l0_rd_mode   = inst[36];
+assign CEN_omem     = inst[48];
+assign WEN_omem     = inst[47];
+assign A_omem       = inst[46:36];
 assign mode         = inst[35];
 assign data_mode    = inst[34];
 assign acc          = inst[33];
@@ -95,33 +91,6 @@ wire [col*psum_bw-1: 0] ofifo_out;
 reg [col*psum_bw-1: 0] ofifo_out_temp;
 reg [15:0] sram_in;
 reg ofifo_rd_q;
-/////////////////////////////////
-//reg [11:0] A_omem;
-// always @(posedge clk)
-// begin
-//     ofifo_rd_q <= ofifo_rd;
-//    if(ofifo_rd_q)
-//         ofifo_out_temp <= ofifo_out; 
-    
-//         if(!CEN_omem && !WEN_omem)
-//         begin
-//     //        A_omem <= A_omem + 1'd1;
-//             sram_in <= ofifo_out_temp[15:0];
-//            ofifo_out_temp[15:0] <= ofifo_out_temp[31:16];
-//             ofifo_out_temp[31:16] <= ofifo_out_temp[47:32];
-//             ofifo_out_temp[47:32] <= ofifo_out_temp[63:48];
-//             ofifo_out_temp[63:48] <= ofifo_out_temp[79:64];
-//             ofifo_out_temp[79:64] <= ofifo_out_temp[95:80];
-//             ofifo_out_temp[95:80] <= ofifo_out_temp[111:96];
-//             ofifo_out_temp[111:96] <= ofifo_out_temp[127:112];
-
-//         end
-
-// end
-
-
-  
-
 // Sram Instantiation for OFIFO
   parameter num = 3000;
  sram_128b_w2048 ofifo_sram (
@@ -135,15 +104,12 @@ reg ofifo_rd_q;
 
 /////////////////////////////////
 
-
 /////////// Corelet Instantation /////////////////
 
 corelet core_inst1 (
     .clk(clk),
     .l0_in(l0_in),
     .l0_rd(l0_rd),
-    .l0_rd_mode(l0_rd_mode),
-    .all_row_mode(all_row_mode),
     .mode(mode),
     .data_mode(data_mode),
     .l0_wr(l0_wr),

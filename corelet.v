@@ -1,5 +1,4 @@
-module corelet (clk, l0_in, l0_rd, l0_rd_mode, all_row_mode, mode, data_mode, ofifo_rd, l0_wr, reset, 
-                ififo_in, ififo_rd, load, execute, ififo_wr, ofifo_out);
+module corelet (clk, l0_in, l0_rd, mode, data_mode, ofifo_rd, l0_wr, reset, ififo_in, ififo_rd, load, execute, ififo_wr, ofifo_out);
   
   parameter row  = 8;
   parameter bw = 4;
@@ -20,8 +19,6 @@ module corelet (clk, l0_in, l0_rd, l0_rd_mode, all_row_mode, mode, data_mode, of
   input ofifo_rd;
   output [col*psum_bw-1: 0]  ofifo_out;
 
-  input all_row_mode;
-  input l0_rd_mode;
   input mode;
   input data_mode;
 
@@ -29,7 +26,6 @@ module corelet (clk, l0_in, l0_rd, l0_rd_mode, all_row_mode, mode, data_mode, of
   wire l0_full;
   wire ififo_ready;
   wire ififo_full;
-  
   
   reg l0_wr_q;
   reg ififo_wr_q;
@@ -46,7 +42,6 @@ module corelet (clk, l0_in, l0_rd, l0_rd_mode, all_row_mode, mode, data_mode, of
         .in(l0_in), 
         .out(l0_out), 
         .rd(l0_rd),
-        .l0_rd_mode(l0_rd_mode),
         .wr(l0_wr_q), 
         .o_full(l0_full), 
         .reset(reset), 
@@ -62,7 +57,6 @@ module corelet (clk, l0_in, l0_rd, l0_rd_mode, all_row_mode, mode, data_mode, of
         .in(ififo_in), 
         .out(ififo_out), 
         .rd(ififo_rd),
-        .l0_rd_mode(1'b0),
         .wr(ififo_wr_q), 
         .o_full(ififo_full), 
         .reset(reset), 
@@ -103,7 +97,6 @@ mac_array mac_array_inst (
 
 
  //////////////// Ofifo Instance ///////////////////////
-
 ////////
 
 
@@ -129,6 +122,7 @@ ofifo ofifo_inst (
   .o_ready(ofifo_ready), 
   .o_valid(ofifo_valid)
 );
+
 
 //////////////////////////////////////////////////////////
 
