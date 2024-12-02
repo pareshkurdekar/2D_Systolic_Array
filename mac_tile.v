@@ -81,7 +81,7 @@ always @ (posedge clk) begin
         end
         else begin 
                 // c_q <= mac_out;
-                inst_q <= inst_w_q; // Passing inst to east
+                inst_q <= inst_w; // Passing inst to east
                 // For output stationary the instrucion does the following: 
                 // inst[0]: Execute 
                 // inst[1]: Hold c_q
