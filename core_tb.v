@@ -3,19 +3,24 @@
 `timescale 1ns/1ps
 
 
-//`include "./verilog/core.v"
-//`include "./verilog/mac_array.v"
-//`include "./verilog/mac_row.v"
-//`include "./verilog/mac_tile.v"
-//`include "./verilog/mac.v"
-//`include "./verilog/corelet.v"
-//`include "./verilog/sram_128b_w2048.v"
-//`include "./verilog/sram_32b_w2048.v"
-//`include "./verilog/fifo_depth64.v"
-//`include "./verilog/fifo_mux_16_1.v"
-//`include "./verilog/fifo_mux_8_1.v"
-//`include "./verilog/fifo_mux_2_1.v"
-//`include "./verilog/l0.v"
+//`include "core.v"
+//`include "mac_array.v"
+//`include "mac_row.v"
+//`include "mac_tile.v"
+//`include "mac.v"
+//`include "ofifo.v"
+//`include "corelet.v"
+//`include "sfp_row.v"
+//`include "sfp.v"
+//`include "relu.v"
+//`include "sram_128b_w2048.v"
+//`include "sram_32b_w2048.v"
+//`include "fifo_depth64.v"
+//`include "fifo_mux_16_1.v"
+//`include "fifo_mux_8_1.v"
+//`include "fifo_mux_2_1.v"
+//`include "l0.v"
+
 
 
 module core_tb;
@@ -31,7 +36,7 @@ parameter len_nij = 36;
 reg clk = 0;
 reg reset = 1;
 
-wire [48:0] inst_q; 
+wire [49:0] inst_q; 
 
 reg mode_q = 0;
 reg data_mode_q = 0;
@@ -48,9 +53,9 @@ reg WEN_omem_q = 1;
 reg [10:0] A_omem = 0;
 reg [10:0] A_omem_q = 0;
 
-reg [bw*row-1:0] D_omem;
-reg [bw*row-1:0] D_omem_q = 0;
 
+reg output_loading_mode = 0;
+reg output_loading_mode_q = 0;
 reg [10:0] A_xmem = 0;
 reg CEN_xmem_q = 1;
 reg WEN_xmem_q = 1;
@@ -87,7 +92,7 @@ reg load;
 reg [8*30:1] stringvar;
 reg [8*30:1] w_file_name;
 wire ofifo_valid;
-wire [col*psum_bw-1:0] sfp_out;
+wire [col*psum_bw-1:0] Q_out;
 
 integer x_file, x_scan_file ; // file_handler
 integer w_file, w_scan_file ; // file_handler
@@ -97,9 +102,12 @@ integer captured_data;
 integer t, i, j, k, kij;
 integer error;
 
+assign inst_q[49] = output_loading_mode_q;
+
 assign inst_q[48] = CEN_omem_q;
 assign inst_q[47] = WEN_omem_q;
 assign inst_q[46:36] = A_omem_q;
+
 assign inst_q[35] = mode_q;
 assign inst_q[34] = data_mode_q;
 assign inst_q[33] = acc_q;
@@ -122,8 +130,8 @@ core  #(.bw(bw), .col(col), .row(row)) core_instance (
 	.clk(clk), 
 	.inst(inst_q),
 	.ofifo_valid(ofifo_valid),
-        .D_xmem(D_xmem_q), 
-        .sfp_out(sfp_out), 
+  .D_xmem(D_xmem_q), 
+  .Q_out(Q_out), 
 	.reset(reset)); 
 
 
@@ -306,7 +314,9 @@ initial begin
 
     /////// Activation data writing to L0 ///////
     
- // Writing into L0
+ // Writing into L0 -> PE Loading & Execution -> Ofifo Loading
+ // -> Read from Ofifo to SRAM
+ // All Simultaneously
 
     #0.5 clk = 1'b0;  mode = 1; data_mode = 0;  // Send wt in wt stationary mode
     #0.5 clk = 1'b1; 
@@ -314,155 +324,569 @@ initial begin
 
   for (t=0; t<len_nij; t=t+1) begin  
 
-    #0.5 clk = 1'b0;   l0_rd = 0; l0_wr = 1; WEN_xmem = 1;  CEN_xmem = 0;if (t>0) A_xmem = A_xmem + 1; 
+    #0.5 clk = 1'b0;   l0_wr = 1; WEN_xmem = 1;  CEN_xmem = 0; if (t>0) A_xmem = A_xmem + 1;  if (t>0) l0_rd = 1; if (t>0)load = 1;if (t>0)execute = 1;
+    if (t == (len_nij / 2)) begin
+          #0.5 clk = 1'b0; ofifo_rd    = 1;
+      end
+      if (t >= (len_nij / 2)+1) begin
+	  #0.5 clk = 1'b0; WEN_omem = 0;  CEN_omem = 0;  A_omem = A_omem + 1; 
+      end
+      if (t > 0 && t < (len_nij)/2) begin
+	      #0.5 clk = 1'b0;
+      end
     #0.5 clk = 1'b1;    
   end
 
-  // Stop Writes & Reads
-
-    #0.5 clk = 1'b0;   l0_rd = 0; l0_wr = 0; WEN_xmem = 1;  CEN_xmem = 1; A_xmem = 0; 
+    #0.5 clk = 1'b0;   l0_rd = 1; l0_wr = 0; WEN_xmem = 1;  CEN_xmem = 1; A_xmem = 0; A_omem = A_omem + 1;
     #0.5 clk = 1'b1;
-  
+    #0.5 clk = 1'b0;   l0_rd = 0; l0_wr = 0; WEN_xmem = 1;  CEN_xmem = 1; A_xmem = 0;  load = 0; execute = 0; A_omem = A_omem + 1;
+    #0.5 clk = 1'b1;
 
-  // Wait for 10 cycles
-  for (t=0; t<10; t=t+1) begin  
+  for (t=0; t<(len_nij/2)-1; t=t+1) begin  
 
-    #0.5 clk = 1'b0;  
+    #0.5 clk = 1'b0;   WEN_omem = 0;  CEN_omem = 0;  A_omem = A_omem + 1; if(t == (len_nij/2)-2) ofifo_rd = 0;  
     #0.5 clk = 1'b1;   
        
   end
+	#0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 1 ; ofifo_rd = 0; 
+	#0.5 clk = 1'b1; 
 
-  // Reading from L0 for testing
-
-  // for (t=0; t<len_nij; t=t+1) begin  
-
-  //   #0.5 clk = 1'b0;   l0_rd = 1; l0_wr = 0; WEN_xmem = 1;  CEN_xmem = 1;
-  //   #0.5 clk = 1'b1;   
-
-  // end
-  //   #0.5 clk = 1'b0;   l0_rd = 0; l0_wr = 0; WEN_xmem = 1;  CEN_xmem = 1;
-  //   #0.5 clk = 1'b1;   
-
-  // for (t=0; t<10; t=t+1) begin  
-
-  //   #0.5 clk = 1'b0;  
-  //   #0.5 clk = 1'b1;   
-       
-  // end
-
-
-
-    /////////////////////////////////////
-
-
-
-    /////// Execution ///////
-    // Load L0 and Execute simultaneously
-
-    for (t=0; t<len_nij; t=t+1) begin  
-
-      #0.5 clk = 1'b0;   l0_rd = 1; l0_wr = 0; load = 1;execute = 1;
-      #0.5 clk = 1'b1;   
-
-   end
-
-      #0.5 clk = 1'b0;   l0_rd = 0; l0_wr = 0; load = 0; execute = 0;
-      #0.5 clk = 1'b1;   
-
-  for (t=0; t<35; t=t+1) begin  
-
-    #0.5 clk = 1'b0;  
-    #0.5 clk = 1'b1;   
-       
-  end
-
-
-
-    /////////////////////////////////////
-
-
-
-    //////// OFIFO READ ////////
-    // Ideally, OFIFO should be read while execution, but we have enough ofifo
-    // depth so we can fetch out after execution.
-
-      #0.5 clk = 1'b0;   ofifo_rd = 1; 
-      #0.5 clk = 1'b1;   
-
-      for (t=0; t<len_nij; t=t+1) 
-      begin  
-        #0.5 clk = 1'b0;   WEN_omem = 0;  CEN_omem = 0;  A_omem = A_omem + 1;   
-        #0.5 clk = 1'b1;   
-      end
-
-      #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 1 ; ofifo_rd = 0; 
-      #0.5 clk = 1'b1;   
-
-
-  
     /////////////////////////////////////
 
 
   end  // end of kij loop
 
+// 1 //////
 
-  // ////////// Accumulation /////////
-  // out_file = $fopen("out.txt", "r");  
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 1;   acc = 1;
+        #0.5 clk = 1'b1;   
 
-  // // Following three lines are to remove the first three comment lines of the file
-  // out_scan_file = $fscanf(out_file,"%s", answer); 
-  // out_scan_file = $fscanf(out_file,"%s", answer); 
-  // out_scan_file = $fscanf(out_file,"%s", answer); 
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 38;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 75;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 115;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 152;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 189;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 229;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 266;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 303;  
+        #0.5 clk = 1'b1;   
 
-  // error = 0;
+        #0.5 clk = 1'b0;  acc = 0;
+        #0.5 clk = 1'b1; 
+
+        #0.5 clk = 1'b0;   WEN_omem = 0;  CEN_omem = 0;  A_omem = 500; output_loading_mode = 1;
+
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 1;  A_omem = 500;  output_loading_mode = 0;
+        #0.5 clk = 1'b1;   
+
+// 2 //////
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 2;    acc = 1;
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 39;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 76;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 116;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 153;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 190;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 230;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 267;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 304;   
+        #0.5 clk = 1'b1;   
+
+        #0.5 clk = 1'b0;  acc = 0;
+        #0.5 clk = 1'b1; 
+
+        #0.5 clk = 1'b0;   WEN_omem = 0;  CEN_omem = 0;  A_omem = 501; output_loading_mode = 1;
+
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 1;  A_omem = 501;  output_loading_mode = 0;
+        #0.5 clk = 1'b1;   
+
+// 3 //////
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 3;    acc = 1;
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 40;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 77;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 117;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 154;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 191;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 231;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 268;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 305;   
+        #0.5 clk = 1'b1;   
+
+        #0.5 clk = 1'b0;  acc = 0;
+        #0.5 clk = 1'b1; 
+
+        #0.5 clk = 1'b0;   WEN_omem = 0;  CEN_omem = 0;  A_omem = 502; output_loading_mode = 1;
+
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 1;  A_omem = 502;  output_loading_mode = 0;
+        #0.5 clk = 1'b1;   
+
+// 4 //////
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 4;    acc = 1;
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 41;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 78;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 118;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 155;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 192;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 232;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 269;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 306;   
+        #0.5 clk = 1'b1;   
+
+        #0.5 clk = 1'b0;  acc = 0;
+        #0.5 clk = 1'b1; 
+
+        #0.5 clk = 1'b0;   WEN_omem = 0;  CEN_omem = 0;  A_omem = 503; output_loading_mode = 1;
+
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 1;  A_omem = 503;  output_loading_mode = 0;
+        #0.5 clk = 1'b1;   
+
+// 5 //////
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 7;    acc = 1;
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 44;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 81;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 121;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 158;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 195;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 235;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 272;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 309;   
+        #0.5 clk = 1'b1;   
+
+        #0.5 clk = 1'b0;  acc = 0;
+        #0.5 clk = 1'b1; 
+
+        #0.5 clk = 1'b0;   WEN_omem = 0;  CEN_omem = 0;  A_omem = 504; output_loading_mode = 1;
+
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 1;  A_omem = 504;  output_loading_mode = 0;
+        #0.5 clk = 1'b1;   
+
+// 6 //////
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 8;    acc = 1;
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 45;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 82;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 122;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 159;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 196;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 236;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 273;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 310;   
+        #0.5 clk = 1'b1;   
+
+        #0.5 clk = 1'b0;  acc = 0;
+        #0.5 clk = 1'b1; 
+
+        #0.5 clk = 1'b0;   WEN_omem = 0;  CEN_omem = 0;  A_omem = 505; output_loading_mode = 1;
+
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 1;  A_omem = 505;  output_loading_mode = 0;
+        #0.5 clk = 1'b1;   
+
+// 7 //////
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 9;    acc = 1;
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 46;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 83;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 123;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 160;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 197;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 237;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 274;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 311;   
+        #0.5 clk = 1'b1;   
+
+        #0.5 clk = 1'b0;  acc = 0;
+        #0.5 clk = 1'b1; 
+
+        #0.5 clk = 1'b0;   WEN_omem = 0;  CEN_omem = 0;  A_omem = 506; output_loading_mode = 1;
+
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 1;  A_omem = 506;  output_loading_mode = 0;
+        #0.5 clk = 1'b1;   
+
+// 8 //////
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 10;    acc = 1;
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 47;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 84;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 124;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 161;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 198;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 238;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 275;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 312;   
+        #0.5 clk = 1'b1;   
+
+        #0.5 clk = 1'b0;  acc = 0;
+        #0.5 clk = 1'b1; 
+
+        #0.5 clk = 1'b0;   WEN_omem = 0;  CEN_omem = 0;  A_omem = 507; output_loading_mode = 1;
+
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 1;  A_omem = 507;  output_loading_mode = 0;
+        #0.5 clk = 1'b1;   
+
+// 9 //////
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 13;    acc = 1;
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 50;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 87;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 127;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 164;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 201;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 241;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 278;   
+        #0.5 clk = 1'b1;  
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 315;   
+        #0.5 clk = 1'b1;   
+
+        #0.5 clk = 1'b0;  acc = 0;
+        #0.5 clk = 1'b1; 
+
+        #0.5 clk = 1'b0;   WEN_omem = 0;  CEN_omem = 0;  A_omem = 508; output_loading_mode = 1;
+
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 1;  A_omem = 508;  output_loading_mode = 0;
+        #0.5 clk = 1'b1;   
+
+// 10 //////
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 14;    acc = 1;
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 51;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 88;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 128;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 165;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 202;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 242;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 279;   
+        #0.5 clk = 1'b1;  
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 316;   
+        #0.5 clk = 1'b1;   
+
+        #0.5 clk = 1'b0;  acc = 0;
+        #0.5 clk = 1'b1; 
+
+        #0.5 clk = 1'b0;   WEN_omem = 0;  CEN_omem = 0;  A_omem = 509; output_loading_mode = 1;
+
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 1;  A_omem = 509;  output_loading_mode = 0;
+        #0.5 clk = 1'b1;   
+
+// 11 //////
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 15;    acc = 1;
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 52;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 89;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 129;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 166;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 203;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 243;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 280;   
+        #0.5 clk = 1'b1;  
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 317;   
+        #0.5 clk = 1'b1;   
+
+        #0.5 clk = 1'b0;  acc = 0;
+        #0.5 clk = 1'b1; 
+
+        #0.5 clk = 1'b0;   WEN_omem = 0;  CEN_omem = 0;  A_omem = 510; output_loading_mode = 1;
+
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 1;  A_omem = 510;  output_loading_mode = 0;
+        #0.5 clk = 1'b1;   
+
+// 12 //////
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 16;    acc = 1;
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 53;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 90;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 130;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 167;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 204;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 244;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 281;   
+        #0.5 clk = 1'b1;  
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 318;   
+        #0.5 clk = 1'b1;   
+
+        #0.5 clk = 1'b0;  acc = 0;
+        #0.5 clk = 1'b1; 
+
+        #0.5 clk = 1'b0;   WEN_omem = 0;  CEN_omem = 0;  A_omem = 511; output_loading_mode = 1;
+
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 1;  A_omem = 511;  output_loading_mode = 0;
+        #0.5 clk = 1'b1;   
+
+// 13 //////
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 19;    acc = 1;
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 56;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 93;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 133;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 170;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 207;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 247;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 284;   
+        #0.5 clk = 1'b1;  
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 321;   
+        #0.5 clk = 1'b1;   
+
+        #0.5 clk = 1'b0;  acc = 0;
+        #0.5 clk = 1'b1; 
+
+        #0.5 clk = 1'b0;   WEN_omem = 0;  CEN_omem = 0;  A_omem = 512; output_loading_mode = 1;
+
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 1;  A_omem = 512;  output_loading_mode = 0;
+        #0.5 clk = 1'b1;   
+
+// 14 //////
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 20;    acc = 1;
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 57;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 94;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 134;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 171;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 208;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 248;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 285;   
+        #0.5 clk = 1'b1;  
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 322;   
+        #0.5 clk = 1'b1;   
+
+        #0.5 clk = 1'b0;  acc = 0;
+        #0.5 clk = 1'b1; 
+
+        #0.5 clk = 1'b0;   WEN_omem = 0;  CEN_omem = 0;  A_omem = 513; output_loading_mode = 1;
+
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 1;  A_omem = 513;  output_loading_mode = 0;
+        #0.5 clk = 1'b1;   
+
+// 15 //////
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 21;    acc = 1;
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 58;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 95;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 135;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 172;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 209;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 249;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 286;   
+        #0.5 clk = 1'b1;  
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 323;   
+        #0.5 clk = 1'b1;   
+
+        #0.5 clk = 1'b0;  acc = 0;
+        #0.5 clk = 1'b1; 
+
+        #0.5 clk = 1'b0;   WEN_omem = 0;  CEN_omem = 0;  A_omem = 514; output_loading_mode = 1;
+
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 1;  A_omem = 514;  output_loading_mode = 0;
+        #0.5 clk = 1'b1;   
+
+
+// 15 //////
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 22;    acc = 1;
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 59;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 96;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 136;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 173;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 210;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 250;   
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 287;   
+        #0.5 clk = 1'b1;  
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 0;  A_omem = 324;   
+        #0.5 clk = 1'b1;   
+
+        #0.5 clk = 1'b0;  acc = 0;
+        #0.5 clk = 1'b1; 
+
+        #0.5 clk = 1'b0;   WEN_omem = 0;  CEN_omem = 0;  A_omem = 515; output_loading_mode = 1;
+
+        #0.5 clk = 1'b1;   
+        #0.5 clk = 1'b0;   WEN_omem = 1;  CEN_omem = 1;  A_omem = 515;  output_loading_mode = 0;
+        #0.5 clk = 1'b1;   
 
 
 
-  // $display("############ Verification Start during accumulation #############"); 
+  for (i=0; i<10 ; i=i+1) begin
+    #0.5 clk = 1'b0;
+    #0.5 clk = 1'b1;  
+  end
 
-  // for (i=0; i<len_onij+1; i=i+1) begin 
+  ////////// Accumulation /////////
+  out_file = $fopen("output.txt", "r");  
 
-  //   #0.5 clk = 1'b0; 
-  //   #0.5 clk = 1'b1; 
+  // Following three lines are to remove the first three comment lines of the file
+  out_scan_file = $fscanf(out_file,"%s", answer); 
+  out_scan_file = $fscanf(out_file,"%s", answer); 
+  out_scan_file = $fscanf(out_file,"%s", answer); 
 
-  //   if (i>0) begin
-  //    out_scan_file = $fscanf(out_file,"%128b", answer); // reading from out file to answer
-  //      if (sfp_out == answer)
-  //        $display("%2d-th output featuremap Data matched! :D", i); 
-  //      else begin
-  //        $display("%2d-th output featuremap Data ERROR!!", i); 
-  //        $display("sfpout: %128b", sfp_out);
-  //        $display("answer: %128b", answer);
-  //        error = 1;
-  //      end
-  //   end
+  error = 0;
+
+
+
+  $display("############ Verification Start during accumulation #############"); 
+
+  for (i=0; i<len_onij+1; i=i+1) begin 
+
+    #0.5 clk = 1'b0;  WEN_omem = 1;  CEN_omem = 0;  A_omem = 500 +i ; 
+    #0.5 clk = 1'b1; 
+
+    if (i>0) begin
+     out_scan_file = $fscanf(out_file,"%128b", answer); // reading from out file to answer
+       if (Q_out == answer)
+         $display("%2d-th output featuremap Data matched! :D", i); 
+       else begin
+         $display("%2d-th output featuremap Data ERROR!!", i); 
+         $display("sfpout: %128b", Q_out);
+         $display("answer: %128b", answer);
+         error = 1;
+       end
+    end
    
  
-  //   #0.5 clk = 1'b0; reset = 1;
-  //   #0.5 clk = 1'b1;  
-  //   #0.5 clk = 1'b0; reset = 0; 
-  //   #0.5 clk = 1'b1;  
+    #0.5 clk = 1'b0; reset = 1;
+    #0.5 clk = 1'b1;  
+    #0.5 clk = 1'b0; reset = 0; 
+    #0.5 clk = 1'b1;  
 
-  //   for (j=0; j<len_kij+1; j=j+1) begin 
+    // for (j=0; j<len_kij+1; j=j+1) begin 
 
-  //     #0.5 clk = 1'b0;   
-  //       if (j<len_kij) begin CEN_pmem = 0; WEN_pmem = 1; acc_scan_file = $fscanf(acc_file,"%11b", A_pmem); end
-  //                      else  begin CEN_pmem = 1; WEN_pmem = 1; end
+    //   #0.5 clk = 1'b0;   
+    //     if (j<len_kij) begin CEN_pmem = 0; WEN_pmem = 1; acc_scan_file = $fscanf(acc_file,"%11b", A_pmem); end
+    //                    else  begin CEN_pmem = 1; WEN_pmem = 1; end
 
-  //       if (j>0)  acc = 1;  
-  //     #0.5 clk = 1'b1;   
-  //   end
+    //     if (j>0)  acc = 1;  
+    //   #0.5 clk = 1'b1;   
+    // end
 
-  //   #0.5 clk = 1'b0; acc = 0;
-  //   #0.5 clk = 1'b1; 
-  // end
+    #0.5 clk = 1'b0; acc = 0;
+    #0.5 clk = 1'b1; 
+  end
 
 
-  // if (error == 0) begin
-  // 	$display("############ No error detected ##############"); 
-  // 	$display("########### Project Completed !! ############"); 
+  if (error == 0) begin
+  	$display("############ No error detected ##############"); 
+  	$display("########### Project Completed !! ############"); 
 
-  // end
+  end
 
   // $fclose(acc_file);
   // //////////////////////////////////
@@ -486,9 +910,11 @@ always @ (posedge clk) begin
    CEN_xmem_q <= CEN_xmem;
    WEN_xmem_q <= WEN_xmem;
 
-   A_omem_q   <= A_omem;
+      A_omem_q   <= A_omem;
    CEN_omem_q <= CEN_omem;
    WEN_omem_q <= WEN_omem;
+
+  output_loading_mode_q = output_loading_mode;
 
    A_pmem_q   <= A_pmem;
    CEN_pmem_q <= CEN_pmem;

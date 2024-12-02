@@ -34,7 +34,7 @@ module mac_array (clk, reset, out_s, in_w, in_n, mode, data_mode, inst_w, valid)
       );
     end
 
-  assign psum_temp[psum_bw*col-1:0] = 0;
+  // assign psum_temp[psum_bw*col-1:0] = 0;
 
   assign out_s = psum_temp[psum_bw*col*(row+1)-1:psum_bw*col*row];
   assign valid = valid_temp[row-1];

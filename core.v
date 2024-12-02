@@ -1,4 +1,4 @@
-module core ( clk, inst, ofifo_valid, D_xmem, sfp_out, reset);
+module core ( clk, inst, ofifo_valid, D_xmem, Q_out, reset);
 
 parameter bw = 4;
 parameter row = 8;
@@ -8,10 +8,10 @@ parameter psum_bw = 16;
 
 input clk;
 input reset;
-input [48:0] inst; 
+input [49:0] inst; 
 output ofifo_valid;
 input [bw*row-1:0]D_xmem;
-output [col*psum_bw-1:0] sfp_out;
+output [col*psum_bw-1:0] Q_out;
 
 wire CEN_xmem;
 wire WEN_xmem;
@@ -35,9 +35,12 @@ wire acc;
 wire mode;
 wire data_mode;
 
+assign output_loading_mode = inst[49];
+
 assign CEN_omem     = inst[48];
 assign WEN_omem     = inst[47];
 assign A_omem       = inst[46:36];
+
 assign mode         = inst[35];
 assign data_mode    = inst[34];
 assign acc          = inst[33];
@@ -61,9 +64,8 @@ wire [127:0 ]Q_out;
 
 reg [bw*col-1:0] l0_in;
 wire [bw*col-1:0] ififo_in;
-
-
 wire [col*psum_bw-1: 0] ofifo_out; 
+
 // Sram 1 Instantiation for L0
 
  sram_32b_w2048 activation_sram (
@@ -78,7 +80,7 @@ wire [col*psum_bw-1: 0] ofifo_out;
 
 ///////////////////////////////////////////////////
 
-// Sram Instantiation for IFIFO
+// Sram 1 Instantiation for IFIFO
 
  sram_32b_w2048 weight_sram (
 	.CLK(clk), 
@@ -88,9 +90,11 @@ wire [col*psum_bw-1: 0] ofifo_out;
    .D(D_xmem), 
    .Q(Q_wt));
 
-reg [col*psum_bw-1: 0] ofifo_out_temp;
-reg [15:0] sram_in;
-reg ofifo_rd_q;
+wire [127:0] sfp_out;
+/////////////////////////////////
+wire [col*psum_bw-1: 0] ofifo_sram_in;
+assign ofifo_sram_in = output_loading_mode ? sfp_out : ofifo_out;
+
 // Sram Instantiation for OFIFO
   parameter num = 3000;
  sram_128b_w2048 ofifo_sram (
@@ -98,11 +102,12 @@ reg ofifo_rd_q;
 	.CEN(CEN_omem), 
 	.WEN(WEN_omem),
    .A(A_omem), 
-   .D(ofifo_out), 
+   .D(ofifo_sram_in), 
    .Q(Q_out));
 
 
 /////////////////////////////////
+
 
 /////////// Corelet Instantation /////////////////
 
@@ -120,6 +125,10 @@ corelet core_inst1 (
     .ofifo_rd(ofifo_rd),
     .load(load),
     .execute(execute),
+    .Q_out(Q_out),
+    .acc(acc),
+    .sfp_out(sfp_out),
+    .output_loading_mode(output_loading_mode),
     .reset(reset)
 
 );

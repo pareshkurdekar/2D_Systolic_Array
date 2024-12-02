@@ -1,4 +1,5 @@
-module corelet (clk, l0_in, l0_rd, mode, data_mode, ofifo_rd, l0_wr, reset, ififo_in, ififo_rd, load, execute, ififo_wr, ofifo_out);
+module corelet (clk, l0_in, l0_rd, mode, data_mode, l0_wr, Q_out, acc, sfp_out,
+                reset, ififo_in, ififo_rd, load, execute, ififo_wr, ofifo_out, ofifo_rd, output_loading_mode);
   
   parameter row  = 8;
   parameter bw = 4;
@@ -14,13 +15,16 @@ module corelet (clk, l0_in, l0_rd, mode, data_mode, ofifo_rd, l0_wr, reset, ifif
   input ififo_wr;
   input l0_wr;
   input reset;
+  input acc;
   input load;
+  input [127:0] Q_out;
   input execute;
-  input ofifo_rd;
-  output [col*psum_bw-1: 0]  ofifo_out;
-
+  input output_loading_mode;
   input mode;
   input data_mode;
+  output [127:0] sfp_out;
+  input ofifo_rd;
+  output [col*psum_bw-1: 0]  ofifo_out;
 
   wire l0_ready;
   wire l0_full;
@@ -42,6 +46,7 @@ module corelet (clk, l0_in, l0_rd, mode, data_mode, ofifo_rd, l0_wr, reset, ifif
         .in(l0_in), 
         .out(l0_out), 
         .rd(l0_rd),
+        .data_mode(data_mode),
         .wr(l0_wr_q), 
         .o_full(l0_full), 
         .reset(reset), 
@@ -57,6 +62,7 @@ module corelet (clk, l0_in, l0_rd, mode, data_mode, ofifo_rd, l0_wr, reset, ifif
         .in(ififo_in), 
         .out(ififo_out), 
         .rd(ififo_rd),
+        .data_mode(data_mode),
         .wr(ififo_wr_q), 
         .o_full(ififo_full), 
         .reset(reset), 
@@ -67,6 +73,7 @@ module corelet (clk, l0_in, l0_rd, mode, data_mode, ofifo_rd, l0_wr, reset, ifif
  //////////////////////////////////////////////////////
 
 wire [psum_bw*col-1:0] out_s;
+
 wire [row*bw-1:0] in_w;
 wire [psum_bw*col-1:0] in_n;
 wire [1:0] inst_w;
@@ -85,7 +92,7 @@ mac_array mac_array_inst (
   .in_w(l0_out),
   .mode(mode),
   .data_mode(data_mode),
-  .in_n(in_n), 
+  .in_n(128'b0), 
   .inst_w({execute, load}), 
   .valid(valid)
   
@@ -96,11 +103,6 @@ mac_array mac_array_inst (
 
 
 
- //////////////// Ofifo Instance ///////////////////////
-////////
-
-
-
  // wire [col*psum_bw-1: 0] ofifo_out; 
   wire ofifo_valid;   
   wire ofifo_full; 
@@ -108,7 +110,6 @@ mac_array mac_array_inst (
 
 
  //////////////// Ofifo Instance ///////////////////////
-
 
 
 ofifo ofifo_inst (
@@ -129,6 +130,15 @@ ofifo ofifo_inst (
 
 
 /////////////////////// SFP ///////////////////////////////
+reg acc_q;
+sfp_row sfp_inst (
+    .clk(clk),    // Clock signal
+    .reset(reset),  // Reset signal
+    .acc(acc_q),    // Accumulate enable
+    .in(Q_out), // Input data bus
+    .out(sfp_out) // Output data bus after ReLU
+
+);
 
 //////////////////////////////////////////////////////////
 
@@ -136,10 +146,11 @@ ofifo ofifo_inst (
 
   always @(posedge clk)
   begin
-     l0_wr_q <= l0_wr;
-     ififo_wr_q <= ififo_wr;
+    l0_wr_q <= l0_wr; 
+    ififo_wr_q <= ififo_wr;
+    acc_q <= acc;
+    valid_q <= valid;
 
-     valid_q <= valid;
   end
 
 endmodule

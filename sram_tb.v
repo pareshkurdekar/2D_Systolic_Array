@@ -2,10 +2,10 @@
 // Please do not spread this code without permission 
 
 `timescale 1 ns/1 ps
-//`include "./verilog/corelet.v"
-//`include "./verilog/sram_128b_w2048.v"
-//`include "./verilog/fifo_depth64.v"
-//`include "./verilog/l0.v"
+`include "corelet.v"
+`include "sram_128b_w2048.v"
+`include "fifo_depth64.v"
+`include "l0.v"
 module sram_tb;
 
 

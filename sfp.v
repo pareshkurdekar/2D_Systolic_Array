@@ -19,7 +19,7 @@ module sfp #(
 
     // Sequential logic for accumulation
     always @(posedge clk) begin
-        if (reset) 
+        if (reset || !acc) 
             psum_q <= 0;
         else if (acc) 
             psum_q <= psum_q + in;  
