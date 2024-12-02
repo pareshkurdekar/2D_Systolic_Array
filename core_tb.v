@@ -144,7 +144,7 @@ initial begin
 
 
   // ------------- ACTIVATION DATA WRITING TO MEMORY --------------//
-  x_file = $fopen("activation_temp_os.txt", "r");
+  x_file = $fopen("activation_output_stationary.txt", "r");
   // Following three lines are to remove the first three comment lines of the file
   x_scan_file = $fscanf(x_file,"%s", captured_data);
   x_scan_file = $fscanf(x_file,"%s", captured_data);
@@ -258,6 +258,9 @@ DONE:
       #0.5 clk = 1'b0;  
 
     end
+
+    #0.5 clk = 1'b1;  load = 1;  // Activation to L0 and weight to IFIFO in output stationary
+    #0.5 clk = 1'b0;
 
     #0.5 clk = 1'b1;  load = 0;  // Activation to L0 and weight to IFIFO in output stationary
     #0.5 clk = 1'b0; 
