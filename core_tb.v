@@ -11,7 +11,9 @@
 `include "corelet.v"
 `include "sram_128b_w2048.v"
 `include "sram_32b_w2048.v"
-//`include "fifo_depth64.v"
+`include "sfp_row.v"
+`include "sfp.v"
+`include "relu.v"
 `include "fifo_mux_16_1.v"
 `include "fifo_mux_8_1.v"
 `include "fifo_mux_2_1.v"
@@ -33,13 +35,23 @@ parameter len_os = 72;
 reg clk = 0;
 reg reset = 1;
 
-wire [37:0] inst_q; 
+wire [50:0] inst_q; 
 
+reg sfu_enable_q = 0;
+reg sfu_enable = 0;
 reg all_row_mode_q = 0;
 reg l0_rd_mode_q = 0;
 reg mode_q = 0;
 reg data_mode_q = 0;
 reg [1:0]  inst_w_q = 0; 
+reg CEN_omem = 1;
+reg WEN_omem = 1;
+reg CEN_omem_q = 1;
+reg WEN_omem_q = 1;
+
+reg [10:0] A_omem = 0;
+reg [10:0] A_omem_q = 0;
+
 reg [bw*row-1:0] D_xmem_q = 0;
 reg CEN_xmem = 1;
 reg WEN_xmem = 1;
@@ -66,9 +78,9 @@ reg acc = 0;
 reg [1:0]  inst_w; 
 reg [bw*row-1:0] D_xmem;
 reg [psum_bw*col-1:0] answer;
+reg output_loading_mode = 0;
+reg output_loading_mode_q = 0;
 
-reg all_row_mode;
-reg l0_rd_mode;
 reg mode;
 reg data_mode;
 reg ofifo_rd;
@@ -81,7 +93,7 @@ reg load;
 reg [8*30:1] stringvar;
 reg [8*30:1] w_file_name;
 wire ofifo_valid;
-wire [col*psum_bw-1:0] sfp_out;
+wire [col*psum_bw-1:0] Q_out;
 
 integer x_file, x_scan_file ; // file_handler
 integer w_file, w_scan_file ; // file_handler
@@ -91,8 +103,15 @@ integer captured_data;
 integer t, i, j, k, kij;
 integer error;
 
-assign inst_q[37] = all_row_mode_q;
-assign inst_q[36] = l0_rd_mode_q;
+assign inst_q[50] = sfu_enable;
+
+assign inst_q[49] = output_loading_mode_q;
+
+assign inst_q[48] = CEN_omem_q;
+assign inst_q[47] = WEN_omem_q;
+assign inst_q[46:36] = A_omem_q;
+
+
 assign inst_q[35] = mode_q;
 assign inst_q[34] = data_mode_q;
 assign inst_q[33] = acc_q;
@@ -116,14 +135,12 @@ core  #(.bw(bw), .col(col), .row(row)) core_instance (
 	.inst(inst_q),
 	.ofifo_valid(ofifo_valid),
         .D_xmem(D_xmem_q), 
-        .sfp_out(sfp_out), 
+        .Q_out(Q_out), 
 	.reset(reset)); 
 
 
 initial begin 
 
-  all_row_mode = 0;
-  l0_rd_mode = 0;
   mode = 0;
   data_mode = 0;
   inst_w   = 0; 
@@ -259,10 +276,10 @@ DONE:
 
     end
 
-    #0.5 clk = 1'b1;  load = 1;  // Activation to L0 and weight to IFIFO in output stationary
+    #0.5 clk = 1'b1;  load = 1;  
     #0.5 clk = 1'b0;
 
-    #0.5 clk = 1'b1;  load = 0;  // Activation to L0 and weight to IFIFO in output stationary
+    #0.5 clk = 1'b1;  load = 0;  
     #0.5 clk = 1'b0; 
 
     for (i=0;i<100; i=i+1)
@@ -271,17 +288,132 @@ DONE:
     #0.5 clk = 1'b0; 
     end
 
-    //////////// ---------- DATA FROM MAC_ARRAY TO OFIFO ---------- ////////
-
-    #0.5 clk = 1'b1;  execute = 1;  data_mode = 1;// Activation to L0 and weight to IFIFO in output stationary
+    //////////// ---------- DATA FROM MAC_ARRAY TO OFIFO ---------- ////////////
+    for (i = 0; i<row+1;i = i+1)  // Accounting for bubble cycle data
+    begin
+    #0.5 clk = 1'b1;  execute = 1;  data_mode = 1;
     #0.5 clk = 1'b0; 
+    end 
+    
+    #0.5 clk = 1'b1;  execute = 0;  
+    #0.5 clk = 1'b0;
 
+    // Pushing read pointer to go past the bubble cycle data
+    #0.5 clk = 1'b1;  ofifo_rd = 1;  
+    #0.5 clk = 1'b0;
 
-    for (i=0;i<100; i=i+1)
+    #0.5 clk = 1'b1;  ofifo_rd = 0;  
+    #0.5 clk = 1'b0;
+
+    for (i=0;i<10; i=i+1)
     begin
     #0.5 clk = 1'b1; 
     #0.5 clk = 1'b0; 
     end
+
+
+    //////////// ---------- DATA FROM OFIFO TO SFU ---------- ////////////
+    #0.5 clk = 1'b1;  sfu_enable = 1; ofifo_rd = 1; A_omem = 8;
+    #0.5 clk = 1'b0;   
+    
+    #0.5 clk = 1'b1;  
+    #0.5 clk = 1'b0;  
+ 
+    for (i = 0; i < row;i = i+1)  // Accounting for bubble cycle data
+    begin
+    #0.5 clk = 1'b1;   WEN_omem = 0;  CEN_omem = 0;  A_omem = A_omem - 1; 
+    #0.5 clk = 1'b0; 
+    end 
+
+    #0.5 clk = 1'b1;  ofifo_rd = 0;  sfu_enable = 0;  WEN_omem = 1;  CEN_omem = 1;  A_omem = 0;
+    #0.5 clk = 1'b0;
+
+
+  // for (t=0; t<row; t=t+1) begin  
+
+  //   #0.5 clk = 1'b0;   WEN_omem = 0;  CEN_omem = 0;  A_omem = A_omem + 1; 
+  //   #0.5 clk = 1'b1;   
+       
+  // end
+
+
+
+
+  for (i=0; i<10 ; i=i+1) begin
+    #0.5 clk = 1'b0;
+    #0.5 clk = 1'b1;  
+  end
+
+  ////////// Accumulation /////////
+  out_file = $fopen("output_8x8.txt", "r");  
+
+  // Following three lines are to remove the first three comment lines of the file
+  out_scan_file = $fscanf(out_file,"%s", answer); 
+  out_scan_file = $fscanf(out_file,"%s", answer); 
+  out_scan_file = $fscanf(out_file,"%s", answer); 
+
+  error = 0;
+
+
+
+  $display("############ Verification Start during accumulation #############"); 
+    #0.5 clk = 1'b0;  WEN_omem = 1;  CEN_omem = 0;  A_omem = 0 ; 
+    #0.5 clk = 1'b1; 
+  for (i=0; i<row; i=i+1) begin 
+
+    #0.5 clk = 1'b0;  WEN_omem = 1;  CEN_omem = 0;  A_omem =  A_omem + 1; 
+    #0.5 clk = 1'b1; 
+
+    if (i>0) begin
+     out_scan_file = $fscanf(out_file,"%128b", answer); // reading from out file to answer
+       if (Q_out == answer)
+         $display("%2d-th output featuremap Data matched! :D", i); 
+       else begin
+         $display("%2d-th output featuremap Data ERROR!!", i); 
+         $display("sfpout: %128b", Q_out);
+         $display("answer: %128b", answer);
+         error = 1;
+       end
+    end
+  end
+ 
+    #0.5 clk = 1'b0; reset = 1;  WEN_omem = 1;  CEN_omem = 1;  A_omem = 0; 
+    #0.5 clk = 1'b1;  
+    #0.5 clk = 1'b0; reset = 0; 
+    #0.5 clk = 1'b1;  
+
+    // for (j=0; j<len_kij+1; j=j+1) begin 
+
+    //   #0.5 clk = 1'b0;   
+    //     if (j<len_kij) begin CEN_pmem = 0; WEN_pmem = 1; acc_scan_file = $fscanf(acc_file,"%11b", A_pmem); end
+    //                    else  begin CEN_pmem = 1; WEN_pmem = 1; end
+
+    //     if (j>0)  acc = 1;  
+    //   #0.5 clk = 1'b1;   
+    // end
+
+    #0.5 clk = 1'b0; acc = 0;
+    #0.5 clk = 1'b1; 
+  
+
+
+  if (error == 0) begin
+  	$display("############ No error detected ##############"); 
+  	$display("########### Project Completed !! ############"); 
+
+  end
+
+  // $fclose(acc_file);
+  // //////////////////////////////////
+
+  // for (t=0; t<10; t=t+1) begin  
+  //   #0.5 clk = 1'b0;  
+  //   #0.5 clk = 1'b1;  
+  // end
+
+  #10 $finish;
+
+
 end
 
 
@@ -290,8 +422,11 @@ always @ (posedge clk) begin
 
    
    inst_w_q   <= inst_w; 
-   all_row_mode_q <= all_row_mode;
-   l0_rd_mode_q <= l0_rd_mode;
+      A_omem_q   <= A_omem;
+   CEN_omem_q <= CEN_omem;
+   WEN_omem_q <= WEN_omem;
+
+  output_loading_mode_q = output_loading_mode;
    mode_q <= mode;
    data_mode_q <= data_mode;
    D_xmem_q   <= D_xmem;
@@ -303,6 +438,8 @@ always @ (posedge clk) begin
    A_xmem_q   <= A_xmem;
    ofifo_rd_q <= ofifo_rd;
    acc_q      <= acc;
+   sfu_enable_q <= sfu_enable;
+
    ififo_wr_q <= ififo_wr;
    ififo_rd_q <= ififo_rd;
    l0_rd_q    <= l0_rd;

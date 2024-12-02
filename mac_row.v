@@ -1,6 +1,5 @@
 // Created by prof. Mingu Kang @VVIP Lab in UCSD ECE department
 // Please do not spread this code without permission 
-// module mac_row (clk, out_s, in_w, in_n_psum, in_n_wt, valid, inst_w, reset, mode);
 module mac_row (clk, out_s, in_w, in_n, valid, inst_w, reset, mode);
 
   parameter bw = 4;
@@ -12,8 +11,6 @@ module mac_row (clk, out_s, in_w, in_n, valid, inst_w, reset, mode);
   output [col-1:0] valid;
   input  [bw-1:0] in_w; // inst[1]:execute, inst[0]: kernel loading
   input  [1:0] inst_w;
-  // input  [psum_bw*col-1:0] in_n_psum;
-  // input  [bw*col-1:0] in_n_wt;
   input [psum_bw*col-1:0] in_n;
   input mode; 
 
@@ -32,13 +29,11 @@ module mac_row (clk, out_s, in_w, in_n, valid, inst_w, reset, mode);
 	    .out_e(temp[bw*(i+1)-1:bw*i]),
 	    .inst_w(inst_temp[2*i-1:2*(i-1)]),
 	    .inst_e(inst_temp[2*(i+1)-1:2*i]),
-	    //.in_n_psum(in_n_psum[psum_bw*i-1:psum_bw*(i-1)]),
-      //.in_n_wt(in_n_wt[bw*i-1:bw*(i-1)]),
       .in_n(in_n[psum_bw*i-1:psum_bw*(i-1)]),
 	    .out_s(out_s[psum_bw*i-1:psum_bw*(i-1)]), 
       .mode(mode)
     );
-   
+    assign valid[i-1] = inst_temp[2*(i)-1];
   end
 
 endmodule

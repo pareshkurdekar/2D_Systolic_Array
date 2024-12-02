@@ -1,4 +1,4 @@
-module corelet (clk, l0_in, l0_rd, l0_rd_mode, ofifo_rd, all_row_mode, mode, l0_ready, l0_full,data_mode, ififo_ready, ififo_full, l0_wr, reset, ififo_in, ififo_rd, load, execute, ififo_wr);
+module corelet (clk, l0_in, l0_rd, l0_rd_mode, ofifo_rd, sfu_enable, sfp_out, all_row_mode, mode, l0_ready, l0_full,data_mode, ififo_ready, ififo_full, l0_wr, reset, ififo_in, ififo_rd, load, execute, ififo_wr);
   
   parameter row  = 8;
   parameter bw = 4;
@@ -15,11 +15,12 @@ module corelet (clk, l0_in, l0_rd, l0_rd_mode, ofifo_rd, all_row_mode, mode, l0_
   input l0_wr;
   input reset;
   input load;
+  input sfu_enable;
   input execute;
   inout ofifo_rd;
   output ififo_ready;
   output l0_ready;
-
+  output [127:0] sfp_out;
     output ififo_full;
   output l0_full;
 
@@ -29,9 +30,7 @@ module corelet (clk, l0_in, l0_rd, l0_rd_mode, ofifo_rd, all_row_mode, mode, l0_
   input mode;
   input data_mode;
 
-  //wire l0_ready;
   wire l0_full;
-  //wire ififo_ready;
   wire ififo_full;
   
   reg l0_wr_q;
@@ -106,8 +105,7 @@ mac_array mac_array_inst (
 
  /////////////////////////////////////////////////////
 
-  wire [col*psum_bw-1: 0] ofifo_out; 
-  // wire ofifo_rd; 
+  wire [col*psum_bw-1: 0] ofifo_out;  
   wire ofifo_valid; 
   wire ofifo_full; 
 
@@ -121,15 +119,28 @@ ofifo ofifo_inst (
   .wr(valid), 
   .o_full(ofifo_full), 
   .reset(reset), 
-  .o_ready(ofifo_rd), 
+  .o_ready(ofifo_ready), 
   .o_valid(ofifo_valid)
 );
 
 //////////////////////////////////////////////////////////
 
+wire [127:0] Q_out;
 
+wire [127:0]sfp_in;
+assign sfp_in = mode ? Q_out : ofifo_out;
+/////////////////////// SFP & Relu ///////////////////////////////
 
-/////////////////////// SFP ///////////////////////////////
+reg acc_q;
+sfp_row sfp_inst (
+    .clk(clk),    // Clock signal
+    .reset(reset),  // Reset signal
+    .en(sfu_enable),
+    .acc(acc_q),    // Accumulate enable
+    .in(sfp_in), // Input data bus
+    .out(sfp_out) // Output data bus after ReLU
+
+);
 
 //////////////////////////////////////////////////////////
 

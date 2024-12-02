@@ -1,4 +1,4 @@
-module core ( clk, inst, ofifo_valid, D_xmem, sfp_out, reset);
+module core ( clk, inst, ofifo_valid, D_xmem, Q_out, reset);
 
 parameter bw = 4;
 parameter row = 8;
@@ -8,10 +8,10 @@ parameter psum_bw = 16;
 
 input clk;
 input reset;
-input [37:0] inst; 
+input [50:0] inst; 
 output ofifo_valid;
 input [bw*row-1:0]D_xmem;
-output [col*psum_bw-1:0] sfp_out;
+output [col*psum_bw-1:0] Q_out;
 
 wire CEN_xmem;
 wire [10:0] A_xmem;
@@ -29,9 +29,23 @@ wire acc;
 wire mode;
 wire data_mode;
 wire all_row_mode;
+wire sfu_enable;
+wire [127:0] sfp_out;
 
-assign all_row_mode   = inst[37];
-assign l0_rd_mode   = inst[36];
+wire CEN_omem;
+wire WEN_omem;
+wire [10:0] A_omem;
+
+
+
+assign sfu_enable = inst[50];
+
+assign output_loading_mode = inst[49];
+
+assign CEN_omem     = inst[48];
+assign WEN_omem     = inst[47];
+assign A_omem       = inst[46:36];
+
 assign mode         = inst[35];
 assign data_mode    = inst[34];
 assign acc          = inst[33];
@@ -57,7 +71,7 @@ reg [bw*col-1:0] ififo_in;
 
 // Sram 1 Instantiation for L0
 
- sram_128b_w2048 activation_sram (
+ sram_32b_w2048 activation_sram (
 	.CLK(clk), 
 	.CEN(CEN_xmem), 
 	.WEN(WEN_xmem & !l0_full),
@@ -71,13 +85,27 @@ reg [bw*col-1:0] ififo_in;
 
 // Sram 1 Instantiation for IFIFO
 
- sram_128b_w2048 weight_sram (
+ sram_32b_w2048 weight_sram (
 	.CLK(clk), 
 	.CEN(CEN_pmem), 
 	.WEN(WEN_pmem & !ififo_full),
    .A(A_pmem), 
    .D(D_xmem), 
    .Q(Q_wt));
+
+
+/////////////////////////////////
+
+/////////////////////////////////
+wire [127:0] o_sram;
+assign o_sram = sfp_out;
+ sram_128b_w2048 ofifo_sram (
+	.CLK(clk), 
+	.CEN(CEN_omem), 
+	.WEN(WEN_omem),
+   .A(A_omem), 
+   .D(o_sram), 
+   .Q(Q_out));
 
 
 /////////////////////////////////
@@ -94,12 +122,14 @@ corelet core_inst1 (
     .data_mode(data_mode),
     .l0_wr(l0_wr),
     .ofifo_rd(ofifo_rd),
+    .sfu_enable(sfu_enable),
     .ififo_in(ififo_in),
     .ififo_rd(ififo_rd),
     .ififo_wr(ififo_wr),
     .load(load),
     .execute(execute),
     .reset(reset),
+    .sfp_out(sfp_out),
     .ififo_ready(ififo_ready),
     .l0_ready(l0_ready),
     .ififo_full(ififo_full),

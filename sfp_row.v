@@ -8,6 +8,8 @@ module sfp_row #(
     input               clk,    // Clock signal
     input               reset,  // Reset signal
     input               acc,    // Accumulate enable
+    input               en,      // SFU enable
+
     input  [psum_bw*col-1:0] in, // Input data bus
     output [psum_bw*col-1:0] out // Output data bus after ReLU
 );
@@ -24,6 +26,7 @@ module sfp_row #(
                 .clk(clk),
                 .reset(reset),
                 .acc(acc),
+                .en(en),
                 .in(in[psum_bw*(i+1)-1 : psum_bw*i]),
                 .out(out_temp[psum_bw*(i+1)-1 : psum_bw*i])
             );
