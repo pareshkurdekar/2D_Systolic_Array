@@ -204,7 +204,7 @@ initial begin
   #0.5 clk = 1'b1;   
   #0.5 clk = 1'b0;   
 
-  //////// Activation data writing to memory ///////
+  //////// Weight data writing to memory ///////
   
   A_pmem = 0;
   for (t=0; t<len_os; t=t+1) begin  
@@ -225,7 +225,7 @@ DONE:
 */
 
 
-// ------------- WEIGHT and ACTIVATION DATA WRITING TO IFIFO anf L0FIFO --------------//
+// ------------- WEIGHT and ACTIVATION DATA WRITING TO IFIFO anf L0FIFO and EXECUTION--------------//
 
     // Read from SRAM 
     // WEN_pmem = 1 => Read Mode on SRAM
@@ -271,6 +271,17 @@ DONE:
     #0.5 clk = 1'b0; 
     end
 
+    //////////// ---------- DATA FROM MAC_ARRAY TO OFIFO ---------- ////////
+
+    #0.5 clk = 1'b1;  execute = 1;  data_mode = 1;// Activation to L0 and weight to IFIFO in output stationary
+    #0.5 clk = 1'b0; 
+
+
+    for (i=0;i<100; i=i+1)
+    begin
+    #0.5 clk = 1'b1; 
+    #0.5 clk = 1'b0; 
+    end
 end
 
 

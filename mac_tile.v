@@ -30,7 +30,11 @@ reg  [1:0] inst_w_q;
 // mode = 0 => Output Stationary 
 // mode = 1 => Weight Stationary
 
-assign out_s  = mode?mac_out:b_q;
+wire [psum_bw-1:0] out_s_os; 
+
+assign out_s_os = inst_w_q[1] ? c_q:b_q; 
+
+assign out_s  = mode?mac_out:out_s_os;
 
 assign out_e  = a_q;
 assign inst_e = inst_q;
@@ -86,7 +90,7 @@ always @ (posedge clk) begin
                 // inst[0]: Execute 
                 // inst[1]: Hold c_q
                 // They switch alternatively
-                if (inst_w_q) begin
+                if (inst_w_q[0]) begin
                    a_q <= in_w;
                    b_q <= in_n[bw-1:0];
                    c_q <= mac_out; 
@@ -98,6 +102,11 @@ always @ (posedge clk) begin
                         b_q <= 0;
                         //load_ready_q <= 0; 
                 end
+
+                if ((inst_w_q[1] == 1)) begin 
+                        c_q <= in_n; 
+                        
+                end 
 
                 /*
                 if (inst_w[0]==1) begin // Hold
