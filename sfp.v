@@ -7,6 +7,9 @@ module sfp #(
     input               clk,      // Clock signal
     input               reset,    // Synchronous reset
     input               acc,      // Accumulate enable
+    input               en,      // SFU enable
+    input               mode,      // SFU enable
+
     input  signed [psum_bw-1:0] in,  // Input partial sum
     output signed [psum_bw-1:0] out  // Output partial sum
 );
@@ -19,10 +22,14 @@ module sfp #(
 
     // Sequential logic for accumulation
     always @(posedge clk) begin
-        if (reset || !acc) 
-            psum_q <= 0;
-        else if (acc) 
-            psum_q <= psum_q + in;  
+    if (reset)
+        psum_q <= 0;
+    if(!acc & !en) 
+        psum_q <= 0;
+    else if (acc & !en) 
+        psum_q <= psum_q + in;
+    else if(en) 
+        psum_q <= in; 
+    
     end
-
 endmodule

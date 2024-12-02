@@ -3,23 +3,24 @@
 `timescale 1ns/1ps
 
 
-//`include "core.v"
-//`include "mac_array.v"
-//`include "mac_row.v"
-//`include "mac_tile.v"
-//`include "mac.v"
-//`include "ofifo.v"
-//`include "corelet.v"
-//`include "sfp_row.v"
-//`include "sfp.v"
-//`include "relu.v"
-//`include "sram_128b_w2048.v"
-//`include "sram_32b_w2048.v"
-//`include "fifo_depth64.v"
-//`include "fifo_mux_16_1.v"
-//`include "fifo_mux_8_1.v"
-//`include "fifo_mux_2_1.v"
-//`include "l0.v"
+`include "core.v"
+`include "mac_array.v"
+`include "mac_row.v"
+`include "mac_tile.v"
+`include "mac.v"
+`include "ofifo.v"
+`include "corelet.v"
+`include "sfp_row.v"
+`include "sfp.v"
+`include "relu.v"
+`include "sram_128b_w2048.v"
+`include "sram_32b_w2048.v"
+`include "fifo_depth64.v"
+`include "fifo_depth16.v"
+`include "fifo_mux_16_1.v"
+`include "fifo_mux_8_1.v"
+`include "fifo_mux_2_1.v"
+`include "l0.v"
 
 
 
@@ -36,7 +37,9 @@ parameter len_nij = 36;
 reg clk = 0;
 reg reset = 1;
 
-wire [49:0] inst_q; 
+wire [50:0] inst_q; 
+reg sfu_enable_q = 0;
+reg sfu_enable = 0;
 
 reg mode_q = 0;
 reg data_mode_q = 0;
@@ -102,6 +105,7 @@ integer captured_data;
 integer t, i, j, k, kij;
 integer error;
 
+assign inst_q[50] = sfu_enable;
 assign inst_q[49] = output_loading_mode_q;
 
 assign inst_q[48] = CEN_omem_q;
@@ -162,7 +166,7 @@ initial begin
   x_scan_file = $fscanf(x_file,"%s", captured_data);
 
   //////// Reset /////////
-  #0.5 clk = 1'b0;   reset = 1;
+  #0.5 clk = 1'b0;   reset = 1; mode = 1;
   #0.5 clk = 1'b1; 
 
   for (i=0; i<10 ; i=i+1) begin
@@ -915,6 +919,7 @@ always @ (posedge clk) begin
    WEN_omem_q <= WEN_omem;
 
   output_loading_mode_q = output_loading_mode;
+   sfu_enable_q <= sfu_enable;
 
    A_pmem_q   <= A_pmem;
    CEN_pmem_q <= CEN_pmem;

@@ -8,7 +8,7 @@ parameter psum_bw = 16;
 
 input clk;
 input reset;
-input [49:0] inst; 
+input [50:0] inst; 
 output ofifo_valid;
 input [bw*row-1:0]D_xmem;
 output [col*psum_bw-1:0] Q_out;
@@ -21,6 +21,7 @@ wire CEN_omem;
 wire WEN_omem;
 wire [10:0] A_omem;
 
+wire sfu_enable;
 wire CEN_pmem ;
 wire WEN_pmem;
 wire [10:0] A_pmem;
@@ -35,6 +36,8 @@ wire acc;
 wire mode;
 wire data_mode;
 
+
+assign sfu_enable = inst[50];
 assign output_loading_mode = inst[49];
 
 assign CEN_omem     = inst[48];
@@ -63,7 +66,7 @@ wire [31:0 ]Q_wt;
 wire [127:0 ]Q_out;
 
 reg [bw*col-1:0] l0_in;
-wire [bw*col-1:0] ififo_in;
+reg [bw*col-1:0] ififo_in;
 wire [col*psum_bw-1: 0] ofifo_out; 
 
 // Sram 1 Instantiation for L0
@@ -71,10 +74,11 @@ wire [col*psum_bw-1: 0] ofifo_out;
  sram_32b_w2048 activation_sram (
 	.CLK(clk), 
 	.CEN(CEN_xmem), 
-	.WEN(WEN_xmem),
+	.WEN(WEN_xmem & !l0_full),
    .A(A_xmem), 
    .D(D_xmem), 
-   .Q(Q_act));
+   .Q(Q_act)
+   );
 
 /////////////////////////////////
 
@@ -85,15 +89,23 @@ wire [col*psum_bw-1: 0] ofifo_out;
  sram_32b_w2048 weight_sram (
 	.CLK(clk), 
 	.CEN(CEN_pmem), 
-	.WEN(WEN_pmem),
+	.WEN(WEN_pmem & !ififo_full),
    .A(A_pmem), 
    .D(D_xmem), 
    .Q(Q_wt));
 
 wire [127:0] sfp_out;
 /////////////////////////////////
+
 wire [col*psum_bw-1: 0] ofifo_sram_in;
 assign ofifo_sram_in = output_loading_mode ? sfp_out : ofifo_out;
+
+
+wire [127:0] o_sram;
+assign o_sram = sfp_out;
+
+wire [col*psum_bw-1: 0] combined_sram_in;
+assign combined_sram_in = mode ? ofifo_sram_in : sfp_out;
 
 // Sram Instantiation for OFIFO
   parameter num = 3000;
@@ -102,7 +114,7 @@ assign ofifo_sram_in = output_loading_mode ? sfp_out : ofifo_out;
 	.CEN(CEN_omem), 
 	.WEN(WEN_omem),
    .A(A_omem), 
-   .D(ofifo_sram_in), 
+   .D(combined_sram_in), 
    .Q(Q_out));
 
 
@@ -120,6 +132,7 @@ corelet core_inst1 (
     .l0_wr(l0_wr),
     .ififo_in(ififo_in),
     .ififo_rd(ififo_rd),
+    .sfu_enable(sfu_enable),
     .ififo_wr(ififo_wr),
     .ofifo_out(ofifo_out),
     .ofifo_rd(ofifo_rd),
@@ -129,7 +142,9 @@ corelet core_inst1 (
     .acc(acc),
     .sfp_out(sfp_out),
     .output_loading_mode(output_loading_mode),
-    .reset(reset)
+    .reset(reset),
+    .ififo_full(ififo_full),
+    .l0_full(l0_full)
 
 );
 
@@ -148,18 +163,16 @@ begin
     end
     else       // Output Stationary
     begin
-    
+
+        l0_in = Q_act;      // L0 will load the activation
+
+        ififo_in = Q_wt;    // IFIFO will load the weights
+
+        // Both these loads will happen ip ch by ip ch
+
+        
 
     end
-end
-// assign l0_in = Q_act;
-// assign ififo_in = Q_wt;
-
-
-always @(posedge clk) begin
-
-   // l0_in <= Q_act;
-
 end
 
 endmodule
