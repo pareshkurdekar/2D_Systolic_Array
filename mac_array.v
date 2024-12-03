@@ -7,13 +7,14 @@ module mac_array (clk, reset, out_s, in_w, in_n, mode, data_mode, inst_w, valid)
 
   input  clk, reset;
   output [psum_bw*col-1:0] out_s;
-  input  [row*bw-1:0] in_w; // inst[1]:execute, inst[0]: kernel loading
+  input  [row*(bw+1)-1:0] in_w; // inst[1]:execute, inst[0]: kernel loading
   input  [1:0] inst_w;
   input  [psum_bw*col-1:0] in_n;
   input mode;
   input data_mode;
 
   output [col-1:0] valid;
+
 
   wire [psum_bw*(row+1)*col-1:0] psum_temp;
   reg [2*row - 1:0] inst_temp;
@@ -27,7 +28,8 @@ module mac_array (clk, reset, out_s, in_w, in_n, mode, data_mode, inst_w, valid)
         .clk(clk),
         .in_n(psum_temp[psum_bw*col*i-1:psum_bw*col*(i-1)]),
         .out_s(psum_temp[psum_bw*col*(i+1)-1:psum_bw*col*i]), 
-        .in_w(in_w[bw*i-1:bw*(i-1)]),
+        .in_w(in_w[(bw+1)*i-2:(bw+1)*(i-1)]),
+        .zero_flag(in_w[(bw+1)*i-1]),
         .inst_w(inst_temp[2*i-1:2*(i-1)]),
         .reset(reset),
         .valid(valid_temp[i-1])

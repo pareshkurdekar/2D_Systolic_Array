@@ -81,6 +81,13 @@ wire [col-1:0] valid;
 reg [col-1:0] valid_q;
 
 
+wire [row*(bw+1)-1:0] zero_out;
+zero_detector_row zero_inst(
+  .in(l0_out),
+  .out(zero_out),
+  .clk(clk),
+  .reset(reset)
+);
 
 
  //////////////// Mac Array Instance ///////////////////
@@ -89,7 +96,7 @@ mac_array mac_array_inst (
   .clk(clk), 
   .reset(reset), 
   .out_s(out_s), 
-  .in_w(l0_out),
+  .in_w(zero_out),
   .mode(mode),
   .data_mode(data_mode),
   .in_n(128'b0), 

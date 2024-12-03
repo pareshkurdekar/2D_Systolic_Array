@@ -1,6 +1,6 @@
 // Created by prof. Mingu Kang @VVIP Lab in UCSD ECE department
 // Please do not spread this code without permission 
-module mac_tile (clk, out_s, in_w, out_e, in_n, inst_w, inst_e, reset);
+module mac_tile (clk, out_s, in_w, out_e, in_n, inst_w, inst_e, zero_flag_w, zero_flag_e, reset);
 
 parameter bw = 4;
 parameter psum_bw = 16;
@@ -12,6 +12,8 @@ input  [1:0] inst_w;
 output [1:0] inst_e;
 input  [psum_bw-1:0] in_n;
 input  clk;
+input zero_flag_w;
+output reg zero_flag_e; 
 input  reset;
 
 reg    [bw-1:0] a_q;
@@ -21,15 +23,21 @@ wire   [psum_bw-1:0] mac_out;
 reg    [1:0] inst_q;
 reg    load_ready_q;
 
+
 assign out_s  = mac_out;
 assign out_e  = a_q;
 assign inst_e = inst_q;
+
+// assign out_s  = zero_flag_w?c_q:mac_out;
+// assign out_e  = zero_flag_w?0:a_q;
+// assign inst_e = inst_q;
 
 
 mac #(.bw(bw), .psum_bw(psum_bw)) mac_instance (
         .a(a_q), 
         .b(b_q),
         .c(c_q),
+        .en(!zero_flag_w),
 	.out(mac_out)
 ); 
 
@@ -40,10 +48,12 @@ always @ (posedge clk) begin
   end
   else begin
        inst_q[1]  <= inst_w[1];
-       if (inst_w) begin
+       zero_flag_e <= zero_flag_w; 
+       if (inst_w ) begin
            a_q <= in_w;
            c_q <= in_n;
        end
+
        if (inst_w[0] && load_ready_q ) begin
           b_q  <= in_w;
           load_ready_q <= 0;

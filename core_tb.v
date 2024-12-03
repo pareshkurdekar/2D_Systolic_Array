@@ -3,25 +3,25 @@
 `timescale 1ns/1ps
 
 
-//`include "core.v"
-//`include "mac_array.v"
-//`include "mac_row.v"
-//`include "mac_tile.v"
-//`include "mac.v"
-//`include "ofifo.v"
-//`include "corelet.v"
-//`include "sfp_row.v"
-//`include "sfp.v"
-//`include "relu.v"
-//`include "sram_128b_w2048.v"
-//`include "sram_32b_w2048.v"
-//`include "fifo_depth64.v"
-//`include "fifo_mux_16_1.v"
-//`include "fifo_mux_8_1.v"
-//`include "fifo_mux_2_1.v"
-//`include "l0.v"
 
-
+`include "core.v"
+`include "mac_array.v"
+`include "mac_row.v"
+`include "mac_tile.v"
+`include "mac.v"
+`include "zero_detector_row.v"
+`include "corelet.v"
+`include "sram_128b_w2048.v"
+`include "sram_32b_w2048.v"
+`include "sfp_row.v"
+`include "sfp.v"
+`include "relu.v"
+`include "fifo_mux_16_1.v"
+`include "fifo_mux_8_1.v"
+`include "fifo_mux_2_1.v"
+`include "l0.v"
+`include "ofifo.v"
+`include "fifo_depth16.v"
 
 module core_tb;
 
